@@ -150,6 +150,29 @@ def list_clientes():
     finally:
         put_conn(conn)
 
+@app.delete("/clientes/{id}")
+def delete_cliente(id: str):
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT 1 FROM clientes WHERE id = %s", (id,))
+        if not cur.fetchone():
+            raise HTTPException(404, "Cliente não encontrado")
+
+        cur.execute(
+            "SELECT 1 FROM debitosclienteEty WHERE codigo_cliente = %s LIMIT 1",
+            (id,)
+        )
+        if cur.fetchone():
+            raise HTTPException(409, "Cliente possui débitos vinculados")
+
+        cur.execute("DELETE FROM clientes WHERE id = %s", (id,))
+        conn.commit()
+        return {"status": "ok"}
+    finally:
+        put_conn(conn)
+
+
 @app.post("/vendas")
 def create_venda(data: VendaIn):
     if exists("venda", "id", data.id):
@@ -191,6 +214,28 @@ def list_vendas():
         
         
         return vendas
+    finally:
+        put_conn(conn)
+
+@app.delete("/vendas/{id}")
+def delete_venda(id: str):
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT 1 FROM venda WHERE id = %s", (id,))
+        if not cur.fetchone():
+            raise HTTPException(404, "Venda não encontrada")
+
+        cur.execute(
+            "SELECT 1 FROM itenvendas WHERE venda_id = %s LIMIT 1",
+            (id,)
+        )
+        if cur.fetchone():
+            raise HTTPException(409, "Venda possui itens vinculados")
+
+        cur.execute("DELETE FROM venda WHERE id = %s", (id,))
+        conn.commit()
+        return {"status": "ok"}
     finally:
         put_conn(conn)
 
@@ -242,5 +287,31 @@ def list_itens_venda(vendaId: str):
                                          valor=r[4],
                                          quantidade=r[5]))
         return itemVenda    
+    finally:
+        put_conn(conn)
+        
+        
+@app.delete("/itens-venda/{id}")
+def delete_item_venda(id: str):
+    return delete_by_id("itenvendas", id)
+
+
+def delete_by_id(table: str, id_value: str):
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT 1 FROM {table} WHERE id = %s",
+            (id_value,)
+        )
+        if not cur.fetchone():
+            raise HTTPException(404, f"Registro não encontrado em {table}")
+
+        cur.execute(
+            f"DELETE FROM {table} WHERE id = %s",
+            (id_value,)
+        )
+        conn.commit()
+        return {"status": "ok", "table": table, "id": id_value}
     finally:
         put_conn(conn)
