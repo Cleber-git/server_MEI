@@ -78,7 +78,7 @@ def create_tables():
             telefone TEXT,
             email TEXT,
             endereco TEXT,
-            total_debitos TEXT
+            totaldebitos TEXT
             )""")
         
         conn.commit()
@@ -134,8 +134,19 @@ def list_clientes():
     try:
         cur = conn.cursor()
         cur.execute("SELECT * FROM clientes")
-        rows = cur.fetchall()
-        return rows
+        row = cur.fetchall()
+        
+        clientes = []
+        
+        for r in row:
+            clientes.append(ClienteIn(
+                id= r[0], 
+                nome=r[1], 
+                telefone=r[2], 
+                email=r[3], 
+                endereco=r[4], 
+                totalDebitos=r[5]))
+        return clientes
     finally:
         put_conn(conn)
 
@@ -160,11 +171,26 @@ def create_venda(data: VendaIn):
 
 @app.get("/vendas")
 def list_vendas():
+    id: str
+    formaPagamento: str
+    valor: float
+    data: str
+    
     conn = get_conn()
     try:
         cur = conn.cursor()
         cur.execute("SELECT * FROM venda")
-        return cur.fetchall()
+        
+        result = cur.fetchall()
+        vendas =[]
+        for row in result:
+            vendas.append(VendaIn(id= row[0], 
+                                  formaPagamento=row[1],
+                                  valor=row[2],
+                                  data=row[3]))
+        
+        
+        return vendas
     finally:
         put_conn(conn)
 
@@ -205,6 +231,16 @@ def list_itens_venda(vendaId: str):
             "SELECT * FROM itenvendas"
         )
         rows = cur.fetchall()
-        return rows    
+        
+        itemVenda=[]
+        
+        for r in rows:
+            itemVenda.append(ItemVendaIn(id=r[0],
+                                         vendaId=r[1],
+                                         tipo=r[2],
+                                         nome=r[3],
+                                         valor=r[4],
+                                         quantidade=r[5]))
+        return itemVenda    
     finally:
         put_conn(conn)
