@@ -5,6 +5,7 @@ import asyncio
 from typing import List
 from fastapi import Query
 from db import *
+from models import *
 
 app = FastAPI()
 
@@ -89,6 +90,121 @@ def create_tables():
         if conn:
             put_conn(conn) # LIBERTA A CONEXÃO MESMO COM ERRO 
         
+def exists(table: str, field: str, value: str) -> bool:
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT 1 FROM {table} WHERE {field} = %s LIMIT 1",
+            (value,)
+        )
+        return cur.fetchone() is not None
+    finally:
+        put_conn(conn)
+
 @app.on_event("startup")
 def startup(): 
     create_tables()
+    
+
+@app.post("/clientes")
+def create_cliente(data: ClienteIn):
+    if exists("clientes", "id", data.id):
+        raise HTTPException(409, "Cliente já existe")
+
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO clientes (id, nome, telefone, email, endereco, total_debitos)
+            VALUES (%s,%s,%s,%s,%s,%s)
+        """, (
+            data.id, data.nome, data.telefone,
+            data.email, data.endereco, data.totalDebitos
+        ))
+        conn.commit()
+        return {"status": "ok"}
+    finally:
+        put_conn(conn)
+
+
+@app.get("/clientes")
+def list_clientes():
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM clientes")
+        rows = cur.fetchall()
+        return rows
+    finally:
+        put_conn(conn)
+
+@app.post("/vendas")
+def create_venda(data: VendaIn):
+    if exists("venda", "id", data.id):
+        raise HTTPException(409, "Venda já existe")
+
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO venda (id, forma_pagamento, valor, data)
+            VALUES (%s,%s,%s,%s)
+        """, (
+            data.id, data.formaPagamento, data.valor, data.data
+        ))
+        conn.commit()
+        return {"status": "ok"}
+    finally:
+        put_conn(conn)
+
+@app.get("/vendas")
+def list_vendas():
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM venda")
+        return cur.fetchall()
+    finally:
+        put_conn(conn)
+
+
+@app.post("/itensVenda")
+def create_item_venda(data: ItemVendaIn):
+    if not exists("venda", "id", data.venda_id):
+        raise HTTPException(404, "Venda não encontrada")
+
+    if exists("itenvendas", "id", data.id):
+        raise HTTPException(409, "Item já existe")
+
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO itenvendas
+            (id, venda_id, tipo, nome, valor, quantidade)
+            VALUES (%s,%s,%s,%s,%s,%s)
+        """, (
+            data.id, data.vendaId, data.tipo,
+            data.nome, data.valor, data.quantidade
+        ))
+        conn.commit()
+        return {"status": "ok"}
+    finally:
+        put_conn(conn)
+
+@app.get("/itens-venda")
+def list_itens_venda(vendaId: str):
+    if not exists("venda", "id", vendaId):
+        raise HTTPException(404, "Venda não encontrada")
+
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT * FROM itenvendas"
+        )
+        rows = cur.fetchall()
+        return rows    
+    finally:
+        put_conn(conn)
