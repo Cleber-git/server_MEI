@@ -17,7 +17,7 @@ def create_tables():
         conn = get_conn()
         cur = conn.cursor()
         
-        cur.execute("""CREATE TABLE IF NOT EXISTIS venda(
+        cur.execute("""CREATE TABLE IF NOT EXISTS venda(
             id TEXT PRIMARY KEY NOT NULL,
             forma_pagamento TEXT,
             valor DECIMAL(10,2),
@@ -33,12 +33,12 @@ def create_tables():
             tipo TEXT
         )""")
         
-        cur.execute("""CREATE TABLE IF NOT EXISTIS perfil(
+        cur.execute("""CREATE TABLE IF NOT EXISTS perfil(
             id TEXT PRIMARY KEY NOT NULL,
             url TEXT
             )""")
         
-        cur.execute("""CREATE TABLE IF NOT EXISTIS pdfvenda(
+        cur.execute("""CREATE TABLE IF NOT EXISTS pdfvenda(
             id TEXT PRIMARY KEY NOT NULL,
             venda_id INTEGER,
             caminho_pdf DECIMAL(10,2),
@@ -47,14 +47,14 @@ def create_tables():
             hora_geracao TEXT
             )""")
 
-        cur.execute("""CREATE TABLE IF NOT EXISTIS pagamentos(
+        cur.execute("""CREATE TABLE IF NOT EXISTS pagamentos(
             id TEXT PRIMARY KEY NOT NULL,
             data  TEXT,
             valor DECIMAL(10,2),
             motivo TEXT
             )""")
         
-        cur.execute("""CREATE TABLE IF NOT EXISTIS itenvendas(
+        cur.execute("""CREATE TABLE IF NOT EXISTS itenvendas(
             id TEXT PRIMARY KEY NOT NULL,
             venda_id INTEGER,
             tipo TEXT,
@@ -63,7 +63,7 @@ def create_tables():
             quantidade INTEGER
             )""")
         
-        cur.execute("""CREATE TABLE IF NOT EXISTIS debitosclienteEty(
+        cur.execute("""CREATE TABLE IF NOT EXISTS debitosclienteEty(
             id TEXT PRIMARY KEY NOT NULL,
             codigo_cliente TEXT,
             periodo TEXT,
@@ -71,7 +71,7 @@ def create_tables():
             situacao TEXT
             )""")
         
-        cur.execute("""CREATE TABLE IF NOT EXISTIS clientes(
+        cur.execute("""CREATE TABLE IF NOT EXISTS clientes(
             id TEXT PRIMARY KEY NOT NULL,
             nome TEXT,
             telefone TEXT,
@@ -89,3 +89,6 @@ def create_tables():
         if conn:
             put_conn(conn) # LIBERTA A CONEXÃO MESMO COM ERRO 
         
+@app.on_event("startup")
+def startup(): 
+    create_tables()
