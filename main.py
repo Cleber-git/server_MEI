@@ -41,7 +41,7 @@ def create_tables():
         
         cur.execute("""CREATE TABLE IF NOT EXISTS pdfvenda(
             id TEXT PRIMARY KEY NOT NULL,
-            venda_id INTEGER,
+            venda_id text,
             caminho_pdf DECIMAL(10,2),
             data  TEXT,
             data_geracao TEXT,
