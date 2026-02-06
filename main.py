@@ -315,3 +315,227 @@ def delete_by_id(table: str, id_value: str):
         return {"status": "ok", "table": table, "id": id_value}
     finally:
         put_conn(conn)
+
+@app.post("/servicos")
+def create_servico(data: ServicoIn):
+    if exists("servico", "id", data.id):
+        raise HTTPException(409, "Serviço já existe")
+
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO servico
+            (id, nome, preco, preco_anterior, data_criacao, tipo)
+            VALUES (%s,%s,%s,%s,%s,%s)
+        """, (
+            data.id, data.nome, data.preco,
+            data.precoAnterior, data.dataCriacao, data.tipo
+        ))
+        conn.commit()
+        return {"status": "ok"}
+    finally:
+        put_conn(conn)
+
+
+@app.get("/servicos")
+def list_servicos():
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM servico")
+        rows = cur.fetchall()
+
+        return [
+            ServicoIn(
+                id=r[0],
+                nome=r[1],
+                preco=r[2],
+                precoAnterior=r[3],
+                dataCriacao=r[4],
+                tipo=r[5]
+            ) for r in rows
+        ]
+    finally:
+        put_conn(conn)
+
+
+@app.delete("/servicos/{id}")
+def delete_servico(id: str):
+    return delete_by_id("servico", id)
+
+@app.post("/perfil")
+def create_perfil(data: PerfilIn):
+    if exists("perfil", "id", data.id):
+        raise HTTPException(409, "Perfil já existe")
+
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO perfil (id, url)
+            VALUES (%s,%s)
+        """, (data.id, data.url))
+        conn.commit()
+        return {"status": "ok"}
+    finally:
+        put_conn(conn)
+
+
+@app.get("/perfil")
+def list_perfil():
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM perfil")
+        rows = cur.fetchall()
+
+        return [PerfilIn(id=r[0], url=r[1]) for r in rows]
+    finally:
+        put_conn(conn)
+
+
+@app.delete("/perfil/{id}")
+def delete_perfil(id: str):
+    return delete_by_id("perfil", id)
+
+@app.post("/pdf-venda")
+def create_pdf_venda(data: PdfVendaIn):
+    if exists("pdfvenda", "id", data.id):
+        raise HTTPException(409, "PDF da venda já existe")
+
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO pdfvenda
+            (id, venda_id, caminho_pdf, data, data_geracao, hora_geracao)
+            VALUES (%s,%s,%s,%s,%s,%s)
+        """, (
+            data.id, data.vendaId, data.caminhoPdf,
+            data.data, data.dataGeracao, data.horaGeracao
+        ))
+        conn.commit()
+        return {"status": "ok"}
+    finally:
+        put_conn(conn)
+
+
+@app.get("/pdf-venda")
+def list_pdf_venda():
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM pdfvenda")
+        rows = cur.fetchall()
+
+        return [
+            PdfVendaIn(
+                id=r[0],
+                vendaId=r[1],
+                caminhoPdf=r[2],
+                data=r[3],
+                dataGeracao=r[4],
+                horaGeracao=r[5]
+            ) for r in rows
+        ]
+    finally:
+        put_conn(conn)
+
+
+@app.delete("/pdf-venda/{id}")
+def delete_pdf_venda(id: str):
+    return delete_by_id("pdfvenda", id)
+
+
+@app.post("/pagamentos")
+def create_pagamento(data: PagamentoIn):
+    if exists("pagamentos", "id", data.id):
+        raise HTTPException(409, "Pagamento já existe")
+
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO pagamentos
+            (id, data, valor, motivo)
+            VALUES (%s,%s,%s,%s)
+        """, (
+            data.id, data.data, data.valor, data.motivo
+        ))
+        conn.commit()
+        return {"status": "ok"}
+    finally:
+        put_conn(conn)
+
+
+@app.get("/pagamentos")
+def list_pagamentos():
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM pagamentos")
+        rows = cur.fetchall()
+
+        return [
+            PagamentoIn(
+                id=r[0],
+                data=r[1],
+                valor=r[2],
+                motivo=r[3]
+            ) for r in rows
+        ]
+    finally:
+        put_conn(conn)
+
+
+@app.delete("/pagamentos/{id}")
+def delete_pagamento(id: str):
+    return delete_by_id("pagamentos", id)
+
+@app.post("/debitos-cliente")
+def create_debito_cliente(data: DebitoClienteIn):
+    if exists("debitosclienteEty", "id", data.id):
+        raise HTTPException(409, "Débito já existe")
+
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO debitosclienteEty
+            (id, codigo_cliente, periodo, valor, situacao)
+            VALUES (%s,%s,%s,%s,%s)
+        """, (
+            data.id, data.codigoCliente,
+            data.periodo, data.valor, data.situacao
+        ))
+        conn.commit()
+        return {"status": "ok"}
+    finally:
+        put_conn(conn)
+
+
+@app.get("/debitos-cliente")
+def list_debitos_cliente():
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM debitosclienteEty")
+        rows = cur.fetchall()
+
+        return [
+            DebitoClienteIn(
+                id=r[0],
+                codigoCliente=r[1],
+                periodo=r[2],
+                valor=r[3],
+                situacao=r[4]
+            ) for r in rows
+        ]
+    finally:
+        put_conn(conn)
+
+
+@app.delete("/debitos-cliente/{id}")
+def delete_debito_cliente(id: str):
+    return delete_by_id("debitosclienteEty", id)
