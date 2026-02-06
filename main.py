@@ -242,7 +242,7 @@ def delete_venda(id: str):
 
 @app.post("/itensVenda")
 def create_item_venda(data: ItemVendaIn):
-    if not exists("venda", "id", data.venda_id):
+    if not exists("venda", "id", data.vendaId):
         raise HTTPException(404, "Venda não encontrada")
 
     if exists("itenvendas", "id", data.id):
