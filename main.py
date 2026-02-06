@@ -57,7 +57,7 @@ def create_tables():
         
         cur.execute("""CREATE TABLE IF NOT EXISTS itenvendas(
             id TEXT PRIMARY KEY NOT NULL,
-            venda_id INTEGER,
+            venda_id TEXT,
             tipo TEXT,
             nome TEXT,
             valor DECIMAL(10,2),
