@@ -4,6 +4,7 @@ from typing import Optional
 
 class ClienteIn(BaseModel):
     id: str
+    empresaUuid: str
     nome: str
     telefone: Optional[str] = None
     email: Optional[str] = None
@@ -13,6 +14,7 @@ class ClienteIn(BaseModel):
 
 class VendaIn(BaseModel):
     id: str
+    empresaUuid: str
     formaPagamento: str
     valor: float
     data: str
@@ -20,26 +22,33 @@ class VendaIn(BaseModel):
 
 class ItemVendaIn(BaseModel):
     id: str
+    empresaUuid: str
     vendaId: str
     tipo: str
-    nome: str
+    nome: strj
     valor: float
     quantidade: int
 
+
 class ServicoIn(BaseModel):
     id: str
+    empresaUuid: str
     nome: str
     preco: float
     precoAnterior: float
     dataCriacao: Optional[str] = None
     tipo: Optional[str] = None
 
+
 class PerfilIn(BaseModel):
     id: str
+    empresaUuid: str
     url: str
+
 
 class PdfVendaIn(BaseModel):
     id: str
+    empresaUuid: str
     vendaId: str
     caminhoPdf: str
     data: Optional[str] = None
@@ -49,14 +58,16 @@ class PdfVendaIn(BaseModel):
 
 class PagamentoIn(BaseModel):
     id: str
+    empresaUuid: str
     data: str
     valor: float
     motivo: Optional[str] = None
 
+
 class DebitoClienteIn(BaseModel):
     id: str
+    empresaUuid: str
     codigoCliente: str
     periodo: str
     valor: float
     situacao: str
-

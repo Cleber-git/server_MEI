@@ -6,8 +6,23 @@ from typing import List
 from fastapi import Query
 from db import *
 from models import *
+from jose import JWTError, jwt
+from datetime import datetime, timedelta
+
+
+SECRET_KEY = "minha_chave_super_secreta_123"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 app = FastAPI()
+
+
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
 
 @app.get("/")
 def read_root():
@@ -106,7 +121,6 @@ def exists(table: str, field: str, value: str) -> bool:
 def startup(): 
     create_tables()
     
-
 @app.post("/clientes")
 def create_cliente(data: ClienteIn):
     if exists("clientes", "id", data.id):
@@ -451,7 +465,7 @@ def delete_pdf_venda(id: str):
 @app.post("/pagamentos")
 def create_pagamento(data: PagamentoIn):
     if exists("pagamentos", "id", data.id):
-        raise HTTPException(409, "Pagamento já existe")
+        raise HTTPException(409, "Pagamento já foi efetuado")
 
     conn = get_conn()
     try:
