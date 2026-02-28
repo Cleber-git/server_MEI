@@ -25,7 +25,7 @@ class ItemVendaIn(BaseModel):
     empresaUuid: str
     vendaId: str
     tipo: str
-    nome: strj
+    nome: str
     valor: float
     quantidade: int
 

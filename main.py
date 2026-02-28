@@ -42,6 +42,7 @@ def create_tables():
         
         cur.execute(""" CREATE TABLE IF NOT EXISTS servico(
             id TEXT PRIMARY KEY NOT NULL,
+            empresaUuid TEXT NOT NULL,
             nome TEXT NOT NULL,
             preco DECIMAL(10,2),
             preco_anterior DECIMAL(10,2),
@@ -340,11 +341,11 @@ def create_servico(data: ServicoIn):
         cur = conn.cursor()
         cur.execute("""
             INSERT INTO servico
-            (id, nome, preco, preco_anterior, data_criacao, tipo)
-            VALUES (%s,%s,%s,%s,%s,%s)
+            (id, nome, preco, preco_anterior, data_criacao, tipo, empresaUuid)
+            VALUES (%s,%s,%s,%s,%s,%s, %s)
         """, (
             data.id, data.nome, data.preco,
-            data.precoAnterior, data.dataCriacao, data.tipo
+            data.precoAnterior, data.dataCriacao, data.tipo, data.empresaUuid
         ))
         conn.commit()
         return {"status": "ok"}
@@ -357,7 +358,7 @@ def list_servicos():
     conn = get_conn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT * FROM servico")
+        cur.execute("SELECT id, nome, preco, preco_anterior, data_criacao, tipo, empresauuid FROM servico")
         rows = cur.fetchall()
 
         return [
@@ -367,7 +368,8 @@ def list_servicos():
                 preco=r[2],
                 precoAnterior=r[3],
                 dataCriacao=r[4],
-                tipo=r[5]
+                tipo=r[5],
+                empresaUuid= r[6]
             ) for r in rows
         ]
     finally:
