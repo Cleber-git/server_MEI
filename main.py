@@ -47,7 +47,10 @@ def create_tables():
             preco DECIMAL(10,2),
             preco_anterior DECIMAL(10,2),
             data_criacao TEXT,
-            tipo TEXT
+            tipo TEXT, 
+            pendenteSync INTEGER,
+            atualizadoEm INTEGER,
+            deletado INTEGER
         )""")
         
         cur.execute("""CREATE TABLE IF NOT EXISTS perfil(
@@ -341,11 +344,11 @@ def create_servico(data: ServicoIn):
         cur = conn.cursor()
         cur.execute("""
             INSERT INTO servico
-            (id, nome, preco, preco_anterior, data_criacao, tipo, empresaUuid)
-            VALUES (%s,%s,%s,%s,%s,%s, %s)
+            (id, nome, preco, preco_anterior, data_criacao, tipo, empresaUuid, pendenteSync, atualizadoEm, deletado)
+            VALUES (%s,%s,%s,%s,%s,%s, %s, %s, %s, %s)
         """, (
             data.id, data.nome, data.preco,
-            data.precoAnterior, data.dataCriacao, data.tipo, data.empresaUuid
+            data.precoAnterior, data.dataCriacao, data.tipo, data.empresaUuid, data.pendenteSync, data.atualizadoEm, data.deletado
         ))
         conn.commit()
         return {"status": "ok"}
