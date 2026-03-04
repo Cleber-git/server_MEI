@@ -361,7 +361,7 @@ def list_servicos():
     conn = get_conn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT id, nome, preco, preco_anterior, data_criacao, tipo, empresauuid FROM servico")
+        cur.execute("SELECT id, nome, preco, preco_anterior, data_criacao, tipo, empresauuid, pendenteSync, atualizadoEm, deletado FROM servico")
         rows = cur.fetchall()
 
         return [
@@ -372,7 +372,10 @@ def list_servicos():
                 precoAnterior=r[3],
                 dataCriacao=r[4],
                 tipo=r[5],
-                empresaUuid= r[6]
+                empresaUuid= r[6],
+                pendenteSync=r[7],
+                atualizadoEm=r[8],
+                deletado=r[9]
             ) for r in rows
         ]
     finally:
