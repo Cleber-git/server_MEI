@@ -38,9 +38,9 @@ class ServicoIn(BaseModel):
     precoAnterior: float
     dataCriacao: Optional[str] = None
     tipo: Optional[str] = None
-    pendenteSync: int
+    pendenteSync: bool
     atualizadoEm: int
-    deletado: int
+    deletado: bool
 
 
 class PerfilIn(BaseModel):
