@@ -126,7 +126,7 @@ def create_tables():
             dataatualizacao TEXT
             )""")
         
-        cur.execut(
+        cur.execute(
             """CREATE TABLE IF NOT EXISTS validationEmail(
         id INTEGER PRIMARY KEY,
         email TEXT NOT NULL,
