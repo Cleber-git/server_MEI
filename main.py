@@ -675,24 +675,24 @@ def receber_email(email: receiverEmail):
         )
 
         conn.commit()
+        enviado = True
+#         enviado = email_service.enviar_email(
+#             email.email,
+#             "Código de validação de email",
+#             f"""Olá,
 
-        enviado = email_service.enviar_email(
-            email.email,
-            "Código de validação de email",
-            f"""Olá,
+# Para concluir sua verificação de email, utilize o código abaixo:
 
-Para concluir sua verificação de email, utilize o código abaixo:
+# Código de validação: {codigo}
 
-Código de validação: {codigo}
+# Este código é válido por tempo limitado.
 
-Este código é válido por tempo limitado.
+# Caso você não tenha solicitado esta verificação, ignore esta mensagem.
 
-Caso você não tenha solicitado esta verificação, ignore esta mensagem.
-
-Atenciosamente,
-Equipe Caltech
-"""
-        )
+# Atenciosamente,
+# Equipe Caltech
+# """
+        # )
 
         if enviado:
             return {"sucesso": True, "mensagem": "Email enviado com sucesso"}
