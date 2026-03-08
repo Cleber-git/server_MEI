@@ -95,3 +95,6 @@ class Empresa(BaseModel):
     dataCadastro: Optional[str] = None
     dataAtualizacao: Optional[str] = None
     
+class getEmpresa(BaseModel):
+    nomeFantasia : str
+    cnpj : str

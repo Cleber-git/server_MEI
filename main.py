@@ -612,3 +612,23 @@ def criar_empresa(empresa:Empresa):
         return {"msg": "Empresa cadastrada com sucesso"}
     finally:
         put_conn(conn)
+        
+        
+@app.get("/empresa")
+def get_empresa():
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT nomefantasia, cnpj FROM empresa")
+        row = cur.fetchall()
+        
+        empresas = []
+        
+        for r in row:
+            empresas.append(getEmpresa(
+                nomeFantasia=r[0],
+                cnpj=r[1]
+                ))
+        return empresas
+    finally:
+        put_conn(conn)
