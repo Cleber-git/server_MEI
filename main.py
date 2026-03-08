@@ -8,20 +8,24 @@ from db import *
 from models import *
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
+from email_ import email_routes
+from random import randrange
+import re 
+from email_ import email_service
 
-
-SECRET_KEY = "minha_chave_super_secreta_123"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+# SECRET_KEY = "minha_chave_super_secreta_123"
+# ALGORITHM = "HS256"
+# ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 app = FastAPI()
 
+# app.include_router(email_routes)
 
-def create_access_token(data: dict):
-    to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+# def create_access_token(data: dict):
+#     to_encode = data.copy()
+#     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+#     to_encode.update({"exp": expire})
+#     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
 @app.get("/")
@@ -121,6 +125,14 @@ def create_tables():
             datacadastro TEXT,
             dataatualizacao TEXT
             )""")
+        
+        cur.execut(
+            """CREATE TABLE IF NOT EXISTS validationEmail(
+        id INTEGER PRIMARY KEY,
+        email TEXT NOT NULL,
+        codigo TEXT NOT NULL
+        )"""
+        )
         
         conn.commit()
         print("Tabelas criadas com sucesso")
@@ -377,7 +389,6 @@ def create_servico(data: ServicoIn):
     finally:
         put_conn(conn)
 
-
 @app.get("/servicos")
 def list_servicos():
     conn = get_conn()
@@ -403,7 +414,6 @@ def list_servicos():
     finally:
         put_conn(conn)
 
-
 @app.delete("/servicos/{id}")
 def delete_servico(id: str):
     return delete_by_id("servico", id)
@@ -425,7 +435,6 @@ def create_perfil(data: PerfilIn):
     finally:
         put_conn(conn)
 
-
 @app.get("/perfil")
 def list_perfil():
     conn = get_conn()
@@ -437,7 +446,6 @@ def list_perfil():
         return [PerfilIn(id=r[0], url=r[1]) for r in rows]
     finally:
         put_conn(conn)
-
 
 @app.delete("/perfil/{id}")
 def delete_perfil(id: str):
@@ -463,7 +471,6 @@ def create_pdf_venda(data: PdfVendaIn):
         return {"status": "ok"}
     finally:
         put_conn(conn)
-
 
 @app.get("/pdf-venda")
 def list_pdf_venda():
@@ -632,3 +639,52 @@ def get_empresa():
         return empresas
     finally:
         put_conn(conn)
+        
+        
+# Validação de email
+def validar_email(email:str):
+    regex = r'^[\w\.-]+@[\w\.-]+\.\w+$'
+    return re.match(regex, email)
+    
+
+@app.post("/email")
+def receber_email(email: receiverEmail):
+    '''Receber o email para validar se a formatação é válida e fazer o envio do código'''
+    
+    if validar_email(email.email == False):
+        raise HTTPException(425, "Modelo não reconhecido como email")
+    
+    codigo = randrange(start=100000,stop=999999)
+    
+    while exists("validationEmail", "codigo", str(codigo)):
+        codigo = randrange(start=100000,stop=999999)
+
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+        INSERT INTO validationEmail (email, codigo) VALUES
+(:email, :codigo)""", email.email, str(codigo))
+        conn.commit()
+        if email_service.enviar_email(email.email, "Código de validação de email", f"""Olá,
+
+Para concluir sua verificação de email, utilize o código abaixo:
+
+Código de validação: {codigo}
+
+Este código é válido por tempo limitado. Caso você não tenha solicitado esta verificação, por favor ignore esta mensagem.
+
+Atenciosamente,
+Equipe Caltech
+"""):
+            return {"msg": "email enviado com sucesso"}
+        else:
+            return {"msg": "falha ao enviar email"}
+    finally:
+        put_conn(conn)
+    
+    
+    
+
+    
+    

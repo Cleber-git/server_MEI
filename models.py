@@ -94,7 +94,14 @@ class Empresa(BaseModel):
     origemAssinatura: Optional[str] = None
     dataCadastro: Optional[str] = None
     dataAtualizacao: Optional[str] = None
-    
+
 class getEmpresa(BaseModel):
     nomeFantasia : str
     cnpj : str
+    
+class receiverEmail(BaseModel):
+    email: str
+    
+class responseEmail(BaseModel):
+    sucesso: bool
+    mensagem: str
