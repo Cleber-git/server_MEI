@@ -662,13 +662,10 @@ def receber_email(email: receiverEmail):
     conn = get_conn()
     try:
         cur = conn.cursor()
-        cur.execute("""
-        INSERT INTO validationEmail (email, codigo)
-        VALUES (:email, :codigo)
-        """, {
-            "email": email.email,
-            "codigo": str(codigo)
-        })
+        cur.execute(
+            "INSERT INTO validationEmail (email, codigo) VALUES (?, ?)",
+            (email.email, str(codigo))
+        )
         conn.commit()
         if email_service.enviar_email(email.email, "Código de validação de email", f"""Olá,
 
