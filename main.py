@@ -85,6 +85,7 @@ def create_tables():
         
         cur.execute("""CREATE TABLE IF NOT EXISTS debitosclienteEty(
             id TEXT PRIMARY KEY NOT NULL,
+            empresauuid TEXT NOT NULL,
             codigo_cliente TEXT,
             periodo TEXT,
             valor TEXT,
@@ -548,10 +549,11 @@ def list_debitos_cliente():
         return [
             DebitoClienteIn(
                 id=r[0],
-                codigoCliente=r[1],
-                periodo=r[2],
-                valor=r[3],
-                situacao=r[4]
+                empresaUuid = r[1],
+                codigoCliente=r[2],
+                periodo=r[3],
+                valor=r[4],
+                situacao=r[5]
             ) for r in rows
         ]
     finally:
