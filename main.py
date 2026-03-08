@@ -128,7 +128,6 @@ def create_tables():
         
         cur.execute(
             """CREATE TABLE IF NOT EXISTS validationEmail(
-        id INTEGER PRIMARY KEY,
         email TEXT NOT NULL,
         codigo TEXT NOT NULL
         )"""
@@ -647,47 +646,61 @@ def validar_email(email:str):
     return re.match(regex, email)
     
 
+from random import randrange
+from fastapi import HTTPException
+
 @app.post("/email")
 def receber_email(email: receiverEmail):
-    '''Receber o email para validar se a formatação é válida e fazer o envio do código'''
-    
-    if validar_email(email.email) == False:
-        raise HTTPException(425, "Modelo não reconhecido como email")
-    
-    codigo = randrange(start=100000,stop=999999)
-    
+    """Receber o email para validar se a formatação é válida e enviar código"""
+
+    if not validar_email(email.email):
+        raise HTTPException(400, "Modelo não reconhecido como email")
+
+    codigo = randrange(100000, 999999)
+
     while exists("validationEmail", "codigo", str(codigo)):
-        codigo = randrange(start=100000,stop=999999)
+        codigo = randrange(100000, 999999)
 
     conn = get_conn()
+
     try:
         cur = conn.cursor()
+
         cur.execute(
             """
             INSERT INTO validationEmail (email, codigo)
             VALUES (%s, %s)
             """,
-        (email.email, str(codigo))
-)
+            (email.email, str(codigo))
+        )
+
         conn.commit()
-        if email_service.enviar_email(email.email, "Código de validação de email", f"""Olá,
+
+        enviado = email_service.enviar_email(
+            email.email,
+            "Código de validação de email",
+            f"""Olá,
 
 Para concluir sua verificação de email, utilize o código abaixo:
 
 Código de validação: {codigo}
 
-Este código é válido por tempo limitado. Caso você não tenha solicitado esta verificação, por favor ignore esta mensagem.
+Este código é válido por tempo limitado.
+
+Caso você não tenha solicitado esta verificação, ignore esta mensagem.
 
 Atenciosamente,
 Equipe Caltech
-"""):
-            return {"sucesso": True, "mensagem": "email enviado com sucesso"}
+"""
+        )
+
+        if enviado:
+            return {"sucesso": True, "mensagem": "Email enviado com sucesso"}
         else:
-            return {"sucesso": False, "mensagem": ""}
+            return {"sucesso": False, "mensagem": "Falha ao enviar email"}
+
     finally:
-        put_conn(conn)
-    
-    
+        put_conn(conn)    
     
 
     
