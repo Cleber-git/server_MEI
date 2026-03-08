@@ -651,7 +651,7 @@ def validar_email(email:str):
 def receber_email(email: receiverEmail):
     '''Receber o email para validar se a formatação é válida e fazer o envio do código'''
     
-    if validar_email(email.email == False):
+    if validar_email(email.email) == False:
         raise HTTPException(425, "Modelo não reconhecido como email")
     
     codigo = randrange(start=100000,stop=999999)
@@ -677,9 +677,9 @@ Este código é válido por tempo limitado. Caso você não tenha solicitado est
 Atenciosamente,
 Equipe Caltech
 """):
-            return {"msg": "email enviado com sucesso"}
+            return {"sucesso": True, "mensagem": "email enviado com sucesso"}
         else:
-            return {"msg": "falha ao enviar email"}
+            return {"sucesso": False, "mensagem": ""}
     finally:
         put_conn(conn)
     
