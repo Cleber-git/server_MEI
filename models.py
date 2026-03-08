@@ -74,3 +74,24 @@ class DebitoClienteIn(BaseModel):
     periodo: str
     valor: float
     situacao: str
+
+class Empresa(BaseModel):
+    id: str
+    uuid: Optional[str] = None
+    cnpj: Optional[str] = None
+    razaoSocial: Optional[str] = None
+    nomeFantasia: Optional[str] = None
+    municipio: Optional[str] = None
+    uf: Optional[str] = None
+    cnae: Optional[str] = None
+    ativo: Optional[bool] = None
+    bloqueado: Optional[bool] = None
+    motivoBloqueio: Optional[str] = None
+    plano: Optional[str] = None
+    statusAssinatura: Optional[str] = None
+    dataInicioAssinatura: Optional[str] = None
+    dataFimAssinatura: Optional[str] = None
+    origemAssinatura: Optional[str] = None
+    dataCadastro: Optional[str] = None
+    dataAtualizacao: Optional[str] = None
+    

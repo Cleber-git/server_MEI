@@ -48,9 +48,9 @@ def create_tables():
             preco_anterior DECIMAL(10,2),
             data_criacao TEXT,
             tipo TEXT, 
-            pendenteSync INTEGER,
+            pendenteSync bool,
             atualizadoEm INTEGER,
-            deletado INTEGER
+            deletado bool
         )""")
         
         cur.execute("""CREATE TABLE IF NOT EXISTS perfil(
@@ -99,6 +99,27 @@ def create_tables():
             email TEXT,
             endereco TEXT,
             totaldebitos TEXT
+            )""")
+        
+        cur.execute("""CREATE TABLE IF NOT EXISTS Empresa(
+            id TEXT PRIMARY KEY NOT NULL,
+            uuid TEXT NOT NULL,
+            cnpj TEXT,
+            razaoSocial TEXT,
+            nomefantasia TEXT,
+            municipio TEXT,
+            uf TEXT,
+            cnae TEXT,
+            ativo bool,
+            bloqueado bool,
+            motivobloqueio TEXT,
+            plano TEXT,
+            statusassinatura TEXT,
+            datainicioassinatura TEXT,
+            datafimassinatura TEXT,
+            origemassinatura TEXT,
+            datacadastro TEXT,
+            dataatualizacao TEXT
             )""")
         
         conn.commit()
@@ -563,3 +584,31 @@ def list_debitos_cliente():
 @app.delete("/debitos-cliente/{id}")
 def delete_debito_cliente(id: str):
     return delete_by_id("debitosclienteEty", id)
+
+
+# Criar empresa
+@app.post("/empresa")
+def criar_empresa(empresa:Empresa):
+    if exists("empresa", "uuid", empresa.uuid):
+        raise HTTPException(409, "Empresa já cadastrada")
+
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+        INSERT INTO Empresa (
+            id, uuid, cnpj, razaoSocial, nomefantasia, municipio,
+            uf, cnae, ativo, bloqueado, motivobloqueio, plano,
+            statusassinatura, datainicioassinatura, datafimassinatura,
+            origemassinatura, datacadastro, dataatualizacao
+        ) VALUES (
+            :id, :uuid, :cnpj, :razaoSocial, :nomefantasia, :municipio,
+            :uf, :cnae, :ativo, :bloqueado, :motivobloqueio, :plano,
+            :statusassinatura, :datainicioassinatura, :datafimassinatura,
+            :origemassinatura, :datacadastro, :dataatualizacao
+        )
+    """, empresa.model_dump())
+        conn.commit()
+        return {"msg": "Empresa cadastrada com sucesso"}
+    finally:
+        put_conn(conn)
