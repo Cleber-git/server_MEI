@@ -745,7 +745,8 @@ def receber_email(email: receiverEmail):
         }
 
         print(data)
-        requests.post(url, json=data, headers=headers)
+        response = requests.post(url, json=data, headers=headers)
+        print(response.json())
 
 
         if enviado:
