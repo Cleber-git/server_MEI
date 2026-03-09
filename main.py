@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from random import randrange
 import re 
 from email_ import email_service
+import requests
 
 # SECRET_KEY = "minha_chave_super_secreta_123"
 # ALGORITHM = "HS256"
@@ -729,13 +730,22 @@ def receber_email(email: receiverEmail):
 
     </div>
 """
-        print(os.getenv("EMAIL_USER"))
-        print(os.getenv("EMAIL_PASSWORD"))
-        enviado = email_service.enviar_email(
-            email.email,
-            "Código de validação de email",
-            mensagem
-            )
+        url = "https://api.resend.com/emails"
+
+        headers = {
+            "Authorization": "Bearer SUA_API_KEY",
+            "Content-Type": "application/json"
+        }
+
+        data = {
+            "from": "Caltech <onboarding@resend.dev>",
+            "to": [{email.email}],
+            "subject": "Código de validação",
+            "html": f"{mensagem}"
+        }
+
+        requests.post(url, json=data, headers=headers)
+
 
         if enviado:
             return {"sucesso": True, "mensagem": "Email enviado com sucesso"}
