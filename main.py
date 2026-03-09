@@ -676,23 +676,64 @@ def receber_email(email: receiverEmail):
 
         conn.commit()
         enviado = True
-#         enviado = email_service.enviar_email(
-#             email.email,
-#             "Código de validação de email",
-#             f"""Olá,
+        mensagem = f"""
+    <div style="background:#f4f6f8;padding:40px 20px;font-family:Arial,sans-serif;">
+        
+        <div style="
+            max-width:500px;
+            margin:auto;
+            background:white;
+            border-radius:10px;
+            padding:30px;
+            text-align:center;
+            box-shadow:0 4px 12px rgba(0,0,0,0.1);
+        ">
 
-# Para concluir sua verificação de email, utilize o código abaixo:
+            <h2 style="color:#0b4a47;margin-bottom:10px;">
+                Verificação de Email
+            </h2>
 
-# Código de validação: {codigo}
+            <p style="color:#555;font-size:15px;">
+                Para concluir sua verificação de email, utilize o código abaixo:
+            </p>
 
-# Este código é válido por tempo limitado.
+            <div style="
+                font-size:32px;
+                letter-spacing:6px;
+                font-weight:bold;
+                color:white;
+                background:#1cc7b5;
+                padding:15px;
+                border-radius:8px;
+                margin:25px 0;
+            ">
+                {codigo}
+            </div>
 
-# Caso você não tenha solicitado esta verificação, ignore esta mensagem.
+            <p style="color:#666;font-size:14px;">
+                Este código é válido por tempo limitado.
+         </p>
 
-# Atenciosamente,
-# Equipe Caltech
-# """
-        # )
+            <hr style="margin:25px 0;border:none;border-top:1px solid #eee;">
+
+            <p style="font-size:13px;color:#888;">
+                Caso você não tenha solicitado esta verificação,<br>
+                ignore esta mensagem.
+            </p>
+
+            <p style="margin-top:25px;font-weight:bold;color:#0b4a47;">
+                Equipe Caltech
+            </p>
+
+        </div>
+
+    </div>
+"""
+        enviado = email_service.enviar_email(
+            email.email,
+            "Código de validação de email",
+            mensagem
+            )
 
         if enviado:
             return {"sucesso": True, "mensagem": "Email enviado com sucesso"}

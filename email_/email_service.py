@@ -11,14 +11,13 @@ def enviar_email(destino, assunto, mensagem):
     msg["To"] = destino
     msg["Subject"] = assunto
 
-    msg.attach(MIMEText(mensagem, "plain"))
-
+    msg.attach(MIMEText(mensagem, "html"))
+    
     try:
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
-        server.login(SMTP_USER, SMTP_PASSWORD)
-        server.send_message(msg)
-        server.quit()
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=10) as server:
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.send_message(msg)
 
         return True
 
