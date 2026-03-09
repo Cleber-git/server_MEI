@@ -739,7 +739,7 @@ def receber_email(email: receiverEmail):
 
         data = {
             "from": "Caltech <onboarding@resend.dev>",
-            "to": [{email.email}],
+            "to": [email.email],
             "subject": "Código de validação",
             "html": f"{mensagem}"
         }
