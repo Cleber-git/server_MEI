@@ -10,6 +10,9 @@ class ClienteIn(BaseModel):
     email: Optional[str] = None
     endereco: Optional[str] = None
     totalDebitos: float = 0.0
+    atualizadoEm : int
+    pendenteSync : bool
+    deletado: bool
 
 
 class VendaIn(BaseModel):

@@ -179,17 +179,16 @@ def create_cliente(data: ClienteIn):
     try:
         cur = conn.cursor()
         cur.execute("""
-            INSERT INTO clientes (id, nome, telefone, email, endereco, totaldebitos)
+            INSERT INTO clientes (id, nome, telefone, email, endereco, totaldebitos, atualizadooem, pendentesync, deletado)
             VALUES (%s,%s,%s,%s,%s,%s)
         """, (
             data.id, data.nome, data.telefone,
-            data.email, data.endereco, data.totalDebitos
+            data.email, data.endereco, data.totalDebitos, data.atualizadoEm, data.pendenteSync, data.deletado
         ))
         conn.commit()
         return {"status": "ok"}
     finally:
         put_conn(conn)
-
 
 @app.get("/clientes")
 def list_clientes():
@@ -208,7 +207,11 @@ def list_clientes():
                 telefone=r[2], 
                 email=r[3], 
                 endereco=r[4], 
-                totalDebitos=r[5]))
+                totalDebitos=r[5],
+                atualizadoEm= r[6],
+                pendenteSync= r[7],
+                deletado=r[8]
+                ))
         return clientes
     finally:
         put_conn(conn)
@@ -234,7 +237,6 @@ def delete_cliente(id: str):
         return {"status": "ok"}
     finally:
         put_conn(conn)
-
 
 @app.post("/vendas")
 def create_venda(data: VendaIn):
