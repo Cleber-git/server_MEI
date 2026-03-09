@@ -14,6 +14,13 @@ import re
 from email_ import email_service
 import requests
 
+import base64
+from email.mime.text import MIMEText
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from google.auth.transport.requests import Request
+import pickle
+
 # SECRET_KEY = "minha_chave_super_secreta_123"
 # ALGORITHM = "HS256"
 # ACCESS_TOKEN_EXPIRE_MINUTES = 60
@@ -730,23 +737,11 @@ def receber_email(email: receiverEmail):
 
     </div>
 """
-        url = "https://api.resend.com/emails"
-
-        headers = {
-            "Authorization": f"Bearer {os.getenv('API_KEY_RESEND')}",
-            "Content-Type": "application/json"
-        }
-
-        data = {
-            "from": "Caltech <onboarding@resend.dev>",
-            "to": [email.email],
-            "subject": "Código de validação",
-            "html": f"{mensagem}"
-        }
-
-        print(data)
-        response = requests.post(url, json=data, headers=headers)
-        print(response.json())
+        enviar_email(
+    email.email,
+    "Código de verificação",
+    mensagem=mensagem
+    )
 
 
         if enviado:
@@ -757,6 +752,45 @@ def receber_email(email: receiverEmail):
     finally:
         put_conn(conn)    
     
+SCOPES = ["https://www.googleapis.com/auth/gmail.send"]
 
+def autenticar():
+    creds = None
+
+    if os.path.exists("token.pickle"):
+        with open("token.pickle", "rb") as token:
+            creds = pickle.load(token)
+
+    if not creds or not creds.valid:
+        flow = InstalledAppFlow.from_client_secrets_file(
+            "credentials.json", SCOPES
+        )
+        creds = flow.run_local_server(port=0)
+
+        with open("token.pickle", "wb") as token:
+            pickle.dump(creds, token)
+
+    return creds
+
+
+def enviar_email(destino, assunto, mensagem):
+
+    creds = autenticar()
+
+    service = build("gmail", "v1", credentials=creds)
+
+    msg = MIMEText(mensagem, "html")
+
+    msg["to"] = destino
+    msg["subject"] = assunto
+
+    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+
+    message = {"raw": raw}
+
+    service.users().messages().send(
+        userId="me",
+        body=message
+    ).execute()
     
     
