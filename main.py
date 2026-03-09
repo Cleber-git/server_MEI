@@ -733,7 +733,7 @@ def receber_email(email: receiverEmail):
         url = "https://api.resend.com/emails"
 
         headers = {
-            "Authorization": "Bearer SUA_API_KEY",
+            "Authorization": f"Bearer {os.getenv("API_KEY_RESEND")}",
             "Content-Type": "application/json"
         }
 
