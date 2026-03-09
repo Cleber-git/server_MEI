@@ -140,7 +140,8 @@ def create_tables():
         
         cur.execute("""CREATE TABLE IF NOT EXISTS validationEmail(
         email TEXT NOT NULL,
-        codigo TEXT NOT NULL
+        codigo TEXT NOT NULL,
+        valida bool DEFAULT TRUE
         )"""
         )
         
@@ -774,6 +775,7 @@ def validar_email(email:str):
 def receber_email(email: receiverEmail):
     """Receber o email para validar se a formatação é válida e enviar código"""
 
+# Adicionar timeOut para tirar código da fila de validade
     if not validar_email(email.email):
         raise HTTPException(400, "Modelo não reconhecido como email")
 
@@ -876,8 +878,6 @@ def receber_email(email: receiverEmail):
 
     finally:
         put_conn(conn)    
-    
-    
     
 @app.post("/usuarios")
 def create_usuario(data: Usuario):
