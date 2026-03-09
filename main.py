@@ -744,6 +744,7 @@ def receber_email(email: receiverEmail):
             "html": f"{mensagem}"
         }
 
+        print(data)
         requests.post(url, json=data, headers=headers)
 
 
