@@ -654,8 +654,8 @@ def validar_email(email:str):
     return re.match(regex, email)
     
 
-from random import randrange
-from fastapi import HTTPException
+# from random import randrange
+# from fastapi import HTTPException
 
 @app.post("/email")
 def receber_email(email: receiverEmail):
