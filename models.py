@@ -81,6 +81,8 @@ class DebitoClienteIn(BaseModel):
     valor: float
     situacao: str
 
+
+
 class Empresa(BaseModel):
     id: str
     uuid: Optional[str] = None
@@ -111,3 +113,17 @@ class receiverEmail(BaseModel):
 class responseEmail(BaseModel):
     sucesso: bool
     mensagem: str
+
+class loginIn(BaseModel):
+    login :str
+    senha: str
+    
+class usuario(BaseModel):
+    uuid : str
+    email: str
+    senhaHash: str
+    nome: str
+    empresaUuid: str
+    ativo: bool
+    dataCadastro: int
+    ultimoLogin: int

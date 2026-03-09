@@ -138,12 +138,24 @@ def create_tables():
             dataatualizacao TEXT
             )""")
         
-        cur.execute(
-            """CREATE TABLE IF NOT EXISTS validationEmail(
+        cur.execute("""CREATE TABLE IF NOT EXISTS validationEmail(
         email TEXT NOT NULL,
         codigo TEXT NOT NULL
         )"""
         )
+        
+        cur.execute("""CREATE TABLE IF NOT EXISTS usuarioMei(
+    uuid TEXT PRIMARY KEY NOT NULL,
+    email TEXT NOT NULL,
+    senhahash TEXT NOT NULL,
+    nome TEXT,
+    empresauuid TEXT,
+    ativo BOOLEAN,
+    datacadastro INTEGER,
+    ultimologin INTEGER
+)
+""")
+        
         
         conn.commit()
         print("Tabelas criadas com sucesso")
@@ -867,3 +879,127 @@ def receber_email(email: receiverEmail):
     
     
     
+@app.post("/usuarios")
+def create_usuario(data: usuario):
+
+    if exists("usuario", "uuid", data.uuid):
+        raise HTTPException(409, "Usuário já existe")
+
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+
+        cur.execute("""
+            INSERT INTO usuarioMei
+            (uuid, email, senhahash, nome, empresauuid, ativo, datacadastro, ultimologin)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+        """, (
+            data.uuid,
+            data.email,
+            data.senhaHash,
+            data.nome,
+            data.empresaUuid,
+            data.ativo,
+            data.dataCadastro,
+            data.ultimoLogin
+        ))
+
+        conn.commit()
+
+        return {"status": "ok"}
+
+    finally:
+        put_conn(conn)
+        
+@app.put("/usuarios")
+def update_usuario(data: usuario):
+
+    if not exists("usuario", "uuid", data.uuid):
+        raise HTTPException(404, "Usuário não encontrado")
+
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+
+        cur.execute("""
+            UPDATE usuarioMei
+            SET
+                email = %s,
+                senhahash = %s,
+                nome = %s,
+                empresauuid = %s,
+                ativo = %s,
+                datacadastro = %s,
+                ultimologin = %s
+            WHERE uuid = %s
+        """, (
+            data.email,
+            data.senhaHash,
+            data.nome,
+            data.empresaUuid,
+            data.ativo,
+            data.dataCadastro,
+            data.ultimoLogin,
+            data.uuid
+        ))
+
+        conn.commit()
+
+        return {"status": "atualizado"}
+
+    finally:
+        put_conn(conn)
+        
+@app.get("/usuarios/{uuid}")
+def get_usuario(uuid: str):
+
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT uuid, email, senhahash, nome, empresauuid, ativo, datacadastro, ultimologin
+            FROM usuarioMei
+            WHERE uuid = %s
+        """, (uuid,))
+
+        row = cur.fetchone()
+
+        if not row:
+            raise HTTPException(404, "Usuário não encontrado")
+
+        return {
+            "uuid": row[0],
+            "email": row[1],
+            "senhaHash": row[2],
+            "nome": row[3],
+            "empresaUuid": row[4],
+            "ativo": row[5],
+            "dataCadastro": row[6],
+            "ultimoLogin": row[7]
+        }
+
+    finally:
+        put_conn(conn)
+        
+@app.delete("/usuarios/{uuid}")
+def delete_usuario(uuid: str):
+
+    if not exists("usuario", "uuid", uuid):
+        raise HTTPException(404, "Usuário não encontrado")
+
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+
+        cur.execute("""
+            DELETE FROM usuarioMei
+            WHERE uuid = %s
+        """, (uuid,))
+
+        conn.commit()
+
+        return {"status": "deletado"}
+
+    finally:
+        put_conn(conn)
