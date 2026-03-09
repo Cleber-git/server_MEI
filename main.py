@@ -81,9 +81,13 @@ def create_tables():
 
         cur.execute("""CREATE TABLE IF NOT EXISTS pagamentos(
             id TEXT PRIMARY KEY NOT NULL,
+            empresauuid TEXT NOT NULL,
             data  TEXT,
             valor DECIMAL(10,2),
-            motivo TEXT
+            motivo TEXT,
+            atualizadoem INTEGER,
+            pendentesync bool,
+            deletado bool
             )""")
         
         cur.execute("""CREATE TABLE IF NOT EXISTS itenvendas(
@@ -554,15 +558,24 @@ def create_pagamento(data: PagamentoIn):
     if exists("pagamentos", "id", data.id):
         raise HTTPException(409, "Pagamento já foi efetuado")
 
+            # id TEXT PRIMARY KEY NOT NULL,
+            # empresauuid TEXT NOT NULL,
+            # data  TEXT,
+            # valor DECIMAL(10,2),
+            # motivo TEXT,
+            # atualizadoem INTEGER,
+            # pendentesync bool,
+            # deletado bool
     conn = get_conn()
     try:
         cur = conn.cursor()
         cur.execute("""
             INSERT INTO pagamentos
-            (id, data, valor, motivo)
-            VALUES (%s,%s,%s,%s)
+            (id, empresauuid, data, valor, motivo, atualizadoem, pendentesync, deletado)
+            VALUES (%s,%s,%s,%s, %s, %s, %s,%s)
         """, (
-            data.id, data.data, data.valor, data.motivo
+            # data.id, data.data, data.valor, data.motivo
+            data.model_dump
         ))
         conn.commit()
         return {"status": "ok"}
@@ -581,9 +594,13 @@ def list_pagamentos():
         return [
             PagamentoIn(
                 id=r[0],
-                data=r[1],
-                valor=r[2],
-                motivo=r[3]
+                empresaUuid = r[1],
+                data=r[2],
+                valor=r[3],
+                motivo=r[4],
+                atualizadoEm= r[5],
+                pendenteSync= r[6],
+                deletado=r[7]
             ) for r in rows
         ]
     finally:

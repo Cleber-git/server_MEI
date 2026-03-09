@@ -65,6 +65,9 @@ class PagamentoIn(BaseModel):
     data: str
     valor: float
     motivo: Optional[str] = None
+    atualizadoEm : int
+    pendenteSync: bool
+    deletado : bool
 
 
 class DebitoClienteIn(BaseModel):
