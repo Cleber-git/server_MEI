@@ -425,6 +425,49 @@ def list_servicos():
 def delete_servico(id: str):
     return delete_by_id("servico", id)
 
+@app.put("/servicos")
+def update_servico(data: ServicoIn):
+
+    if not exists("servico", "id", data.id):
+        raise HTTPException(404, "Serviço não encontrado")
+
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+
+        cur.execute("""
+            UPDATE servico
+            SET
+                nome = %s,
+                preco = %s,
+                preco_anterior = %s,
+                data_criacao = %s,
+                tipo = %s,
+                empresaUuid = %s,
+                pendenteSync = %s,
+                atualizadoEm = %s,
+                deletado = %s
+            WHERE id = %s
+        """, (
+            data.nome,
+            data.preco,
+            data.precoAnterior,
+            data.dataCriacao,
+            data.tipo,
+            data.empresaUuid,
+            data.pendenteSync,
+            data.atualizadoEm,
+            data.deletado,
+            data.id
+        ))
+
+        conn.commit()
+
+        return {"status": "atualizado"}
+
+    finally:
+        put_conn(conn)
+
 @app.post("/perfil")
 def create_perfil(data: PerfilIn):
     if exists("perfil", "id", data.id):
@@ -763,4 +806,6 @@ def receber_email(email: receiverEmail):
 
     finally:
         put_conn(conn)    
+    
+    
     
