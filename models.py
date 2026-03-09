@@ -117,8 +117,9 @@ class responseEmail(BaseModel):
 class loginIn(BaseModel):
     login :str
     senha: str
+
     
-class usuario(BaseModel):
+class Usuario(BaseModel):
     uuid : str
     email: str
     senhaHash: str
@@ -127,3 +128,13 @@ class usuario(BaseModel):
     ativo: bool
     dataCadastro: int
     ultimoLogin: int
+    
+class loginResponse(BaseModel):
+    sucesso:str
+    mensagem:str
+    usuario: Usuario
+    empresa : Empresa
+    
+    
+    
+    

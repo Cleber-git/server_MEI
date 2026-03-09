@@ -880,7 +880,7 @@ def receber_email(email: receiverEmail):
     
     
 @app.post("/usuarios")
-def create_usuario(data: usuario):
+def create_usuario(data: Usuario):
 
     if exists("usuario", "uuid", data.uuid):
         raise HTTPException(409, "Usuário já existe")
@@ -912,7 +912,7 @@ def create_usuario(data: usuario):
         put_conn(conn)
         
 @app.put("/usuarios")
-def update_usuario(data: usuario):
+def update_usuario(data: Usuario):
 
     if not exists("usuario", "uuid", data.uuid):
         raise HTTPException(404, "Usuário não encontrado")
@@ -950,8 +950,8 @@ def update_usuario(data: usuario):
     finally:
         put_conn(conn)
         
-@app.get("/usuarios/{uuid}")
-def get_usuario(uuid: str):
+@app.get("/usuarios")
+def get_usuarios():
 
     conn = get_conn()
     try:
@@ -959,29 +959,30 @@ def get_usuario(uuid: str):
 
         cur.execute("""
             SELECT uuid, email, senhahash, nome, empresauuid, ativo, datacadastro, ultimologin
-            FROM usuarioMei
-            WHERE uuid = %s
-        """, (uuid,))
+            FROM usuario
+        """)
 
-        row = cur.fetchone()
+        rows = cur.fetchall()
 
-        if not row:
-            raise HTTPException(404, "Usuário não encontrado")
+        usuarios = []
 
-        return {
-            "uuid": row[0],
-            "email": row[1],
-            "senhaHash": row[2],
-            "nome": row[3],
-            "empresaUuid": row[4],
-            "ativo": row[5],
-            "dataCadastro": row[6],
-            "ultimoLogin": row[7]
-        }
+        for row in rows:
+            usuarios.append({
+                "uuid": row[0],
+                "email": row[1],
+                "senhaHash": row[2],
+                "nome": row[3],
+                "empresaUuid": row[4],
+                "ativo": row[5],
+                "dataCadastro": row[6],
+                "ultimoLogin": row[7]
+            })
+
+        return usuarios
 
     finally:
-        put_conn(conn)
-        
+        put_conn(conn)  
+              
 @app.delete("/usuarios/{uuid}")
 def delete_usuario(uuid: str):
 
@@ -1000,6 +1001,104 @@ def delete_usuario(uuid: str):
         conn.commit()
 
         return {"status": "deletado"}
+
+    finally:
+        put_conn(conn)
+        
+        
+        
+from fastapi import HTTPException
+import hashlib
+
+@app.post("/login", response_model=loginResponse)
+def login(data: loginIn):
+
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+
+        # buscar usuário pelo email
+        cur.execute("""
+            SELECT uuid, email, senhahash, nome, empresauuid, ativo, datacadastro, ultimologin
+            FROM usuario
+            WHERE email = %s
+        """, (data.login,))
+
+        user = cur.fetchone()
+
+        # se não achou pelo email, tenta pelo CNPJ da empresa
+        if not user:
+            cur.execute("""
+                SELECT u.uuid, u.email, u.senhahash, u.nome, u.empresauuid, u.ativo, u.datacadastro, u.ultimologin
+                FROM usuario u
+                JOIN empresa e ON e.uuid = u.empresauuid
+                WHERE e.cnpj = %s
+            """, (data.login,))
+
+            user = cur.fetchone()
+
+        if not user:
+            raise HTTPException(401, "Usuário não encontrado")
+
+        # verificar senha
+        # senha_hash = hashlib.sha256(data.senha.encode()).hexdigest()
+
+        if data.senha != user[2]:
+            raise HTTPException(401, "Senha incorreta")
+
+        # buscar empresa
+        cur.execute("""
+            SELECT id, uuid, cnpj, razaosocial, nomefantasia, municipio, uf,
+                   cnae, ativo, bloqueado, motivobloqueio, plano,
+                   statusassinatura, datainicioassinatura, datafimassinatura,
+                   origemassinatura, datacadastro, dataatualizacao
+            FROM empresa
+            WHERE uuid = %s
+        """, (user[4],))
+
+        emp = cur.fetchone()
+
+        if not emp:
+            raise HTTPException(404, "Empresa não encontrada")
+
+        usuario_obj = Usuario(
+            uuid=user[0],
+            email=user[1],
+            senhaHash=user[2],
+            nome=user[3],
+            empresaUuid=user[4],
+            ativo=user[5],
+            dataCadastro=user[6],
+            ultimoLogin=user[7]
+        )
+
+        empresa_obj = Empresa(
+            id=emp[0],
+            uuid=emp[1],
+            cnpj=emp[2],
+            razaoSocial=emp[3],
+            nomeFantasia=emp[4],
+            municipio=emp[5],
+            uf=emp[6],
+            cnae=emp[7],
+            ativo=emp[8],
+            bloqueado=emp[9],
+            motivoBloqueio=emp[10],
+            plano=emp[11],
+            statusAssinatura=emp[12],
+            dataInicioAssinatura=emp[13],
+            dataFimAssinatura=emp[14],
+            origemAssinatura=emp[15],
+            dataCadastro=emp[16],
+            dataAtualizacao=emp[17]
+        )
+
+        return loginResponse(
+            sucesso= True,
+            mensagem="Login realizado com sucesso",
+            usuario=usuario_obj,
+            empresa=empresa_obj
+        )
 
     finally:
         put_conn(conn)
