@@ -729,6 +729,8 @@ def receber_email(email: receiverEmail):
 
     </div>
 """
+        print(os.getenv("EMAIL_USER"))
+        print(os.getenv("EMAIL_PASSWORD"))
         enviado = email_service.enviar_email(
             email.email,
             "Código de validação de email",
