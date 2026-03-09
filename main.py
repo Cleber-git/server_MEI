@@ -581,6 +581,45 @@ def create_pagamento(data: PagamentoIn):
         return {"status": "ok"}
     finally:
         put_conn(conn)
+        
+@app.put("/pagamentos")
+def update_pagamento(data: PagamentoIn):
+
+    if not exists("pagamentos", "id", data.id):
+        raise HTTPException(404, "Pagamento não encontrado")
+
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+
+        cur.execute("""
+            UPDATE pagamentos
+            SET
+                empresauuid = %s,
+                data = %s,
+                valor = %s,
+                motivo = %s,
+                atualizadoem = %s,
+                pendentesync = %s,
+                deletado = %s
+            WHERE id = %s
+        """, (
+            data.empresauuid,
+            data.data,
+            data.valor,
+            data.motivo,
+            data.atualizadoem,
+            data.pendentesync,
+            data.deletado,
+            data.id
+        ))
+
+        conn.commit()
+
+        return {"status": "atualizado"}
+
+    finally:
+        put_conn(conn)
 
 
 @app.get("/pagamentos")
