@@ -746,7 +746,7 @@ def criar_empresa(empresa:Empresa):
     try:
         cur = conn.cursor()
         cur.execute("""
-        INSERT INTO Empresa (
+        INSERT INTO empresa (
             uuid, cnpj, razaoSocial, nomefantasia, municipio,
             uf, cnae, ativo, bloqueado, motivobloqueio, plano,
             statusassinatura, datainicioassinatura, datafimassinatura,

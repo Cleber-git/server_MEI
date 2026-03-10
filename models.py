@@ -96,11 +96,11 @@ class Empresa(BaseModel):
     motivoBloqueio: Optional[str] = None
     plano: Optional[str] = None
     statusAssinatura: Optional[str] = None
-    dataInicioAssinatura: Optional[str] = None
-    dataFimAssinatura: Optional[str] = None
+    dataInicioAssinatura: Optional[int] = None
+    dataFimAssinatura: Optional[int] = None
     origemAssinatura: Optional[str] = None
-    dataCadastro: Optional[str] = None
-    dataAtualizacao: Optional[str] = None
+    dataCadastro: Optional[int] = None
+    dataAtualizacao: Optional[int] = None
     sincronizado: bool
     
 
