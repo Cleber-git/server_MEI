@@ -906,9 +906,12 @@ def receber_email(email: receiverEmail):
 @app.post("/usuarios")
 def create_usuario(data: Usuario):
 
-    if exists("usuario", "uuid", data.uuid) :
+    if exists("usuarioMei", "uuid", data.uuid) :
         raise HTTPException(409, "Usuário já existe")
 
+    if exists("usuarioMei", "email", data.email) :
+        raise HTTPException(409, "Email já associado à um usuário")
+    
     conn = get_conn()
     try:
         cur = conn.cursor()
