@@ -747,12 +747,12 @@ def criar_empresa(empresa:Empresa):
         cur = conn.cursor()
         cur.execute("""
         INSERT INTO Empresa (
-            id, uuid, cnpj, razaoSocial, nomefantasia, municipio,
+            uuid, cnpj, razaoSocial, nomefantasia, municipio,
             uf, cnae, ativo, bloqueado, motivobloqueio, plano,
             statusassinatura, datainicioassinatura, datafimassinatura,
             origemassinatura, datacadastro, dataatualizacao
         ) VALUES (
-            :id, :uuid, :cnpj, :razaoSocial, :nomefantasia, :municipio,
+            :uuid, :cnpj, :razaoSocial, :nomefantasia, :municipio,
             :uf, :cnae, :ativo, :bloqueado, :motivobloqueio, :plano,
             :statusassinatura, :datainicioassinatura, :datafimassinatura,
             :origemassinatura, :datacadastro, :dataatualizacao

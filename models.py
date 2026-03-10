@@ -84,7 +84,6 @@ class DebitoClienteIn(BaseModel):
 
 
 class Empresa(BaseModel):
-    id: str
     uuid: Optional[str] = None
     cnpj: Optional[str] = None
     razaoSocial: Optional[str] = None
