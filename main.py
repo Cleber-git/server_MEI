@@ -752,12 +752,25 @@ def criar_empresa(empresa:Empresa):
             statusassinatura, datainicioassinatura, datafimassinatura,
             origemassinatura, datacadastro, dataatualizacao
         ) VALUES (
-            :uuid, :cnpj, :razaoSocial, :nomefantasia, :municipio,
-            :uf, :cnae, :ativo, :bloqueado, :motivobloqueio, :plano,
-            :statusassinatura, :datainicioassinatura, :datafimassinatura,
-            :origemassinatura, :datacadastro, :dataatualizacao
+            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s, %s,%s,%s
         )
-    """, empresa.model_dump())
+    """,     (empresa.uuid,
+    empresa.cnpj,
+    empresa.razaoSocial,
+    empresa.nomeFantasia,
+    empresa.municipio,
+    empresa.uf,
+    empresa.cnae,
+    empresa.ativo,
+    empresa.bloqueado,
+    empresa.motivoBloqueio,
+    empresa.plano,
+    empresa.statusAssinatura,
+    empresa.dataInicioAssinatura,
+    empresa.dataFimAssinatura,
+    empresa.origemAssinatura,
+    empresa.dataCadastro,
+    empresa.dataAtualizacao))
         conn.commit()
         return {"msg": "Empresa cadastrada com sucesso"}
     finally:
