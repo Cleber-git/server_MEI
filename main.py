@@ -852,23 +852,14 @@ def receber_email(email: receiverEmail):
 
     </div>
 """
-        url = "https://api.resend.com/emails"
+        print(os.getenv("EMAIL_USER"))
+        print(os.getenv("EMAIL_PASSWORD"))
+        enviado = email_service.enviar_email(
+            email.email,
+            "Código de validação de email",
+            mensagem
+            )
 
-        headers = {
-            "Authorization": f"Bearer {os.getenv('API_KEY_RESEND')}",
-            "Content-Type": "application/json"
-        }
-
-        data = {
-            "from": "Caltech <noreply@caltechsolucoes.com>",
-            "to": [email.email],
-            "subject": "Código de validação",
-            "html": f"{mensagem}"
-        }
-
-        print(data)
-        response = requests.post(url, json=data, headers=headers)
-        print(response.json())
 
 
         if enviado:
