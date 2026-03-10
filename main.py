@@ -791,10 +791,10 @@ def receber_email(email: receiverEmail):
 
         cur.execute(
             """
-            INSERT INTO validationEmail (email, codigo)
-            VALUES (%s, %s)
+            INSERT INTO validationEmail (email, codigo, valida)
+        VALUES (%s, %s, %s)
             """,
-            (email.email, str(codigo))
+            (email.email, str(codigo), True)
         )
 
         conn.commit()
@@ -1137,3 +1137,4 @@ def validaEmail(data: ValidarEmailIn):
 
     finally:
         put_conn(conn)
+        
