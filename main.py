@@ -157,6 +157,28 @@ def create_tables():
 )
 """)
         
+        cur.execute("""CREATE TABLE IF NOT EXISTS public.empresa
+        (
+            id text COLLATE pg_catalog."default" NOT NULL,
+            uuid text COLLATE pg_catalog."default" NOT NULL,
+            cnpj text COLLATE pg_catalog."default",
+            razaosocial text COLLATE pg_catalog."default",
+            nomefantasia text COLLATE pg_catalog."default",
+            municipio text COLLATE pg_catalog."default",
+            uf text COLLATE pg_catalog."default",
+            cnae text COLLATE pg_catalog."default",
+            ativo boolean,
+            bloqueado boolean,
+            motivobloqueio text COLLATE pg_catalog."default",
+            plano text COLLATE pg_catalog."default",
+            statusassinatura text COLLATE pg_catalog."default",
+            datainicioassinatura text COLLATE pg_catalog."default",
+            datafimassinatura text COLLATE pg_catalog."default",
+            origemassinatura text COLLATE pg_catalog."default",
+            datacadastro text COLLATE pg_catalog."default",
+            dataatualizacao text COLLATE pg_catalog."default",
+            sincronizado boolean 
+        )""")
         
         conn.commit()
         print("Tabelas criadas com sucesso")
@@ -793,12 +815,12 @@ def receber_email(email: receiverEmail):
             """
             INSERT INTO validationEmail (email, codigo, valida)
         VALUES (%s, %s, %s)
-            """,
+            """,    
             (email.email, str(codigo), True)
         )
 
         conn.commit()
-        enviado = True
+        # enviado = True
         mensagem = f"""
     <div style="background:#f4f6f8;padding:40px 20px;font-family:Arial,sans-serif;">
         
@@ -859,8 +881,6 @@ def receber_email(email: receiverEmail):
             "Código de validação de email",
             mensagem
             )
-
-
 
         if enviado:
             return {"sucesso": True, "mensagem": "Email enviado com sucesso"}
@@ -1138,3 +1158,77 @@ def validaEmail(data: ValidarEmailIn):
     finally:
         put_conn(conn)
         
+@app.post("/empresa")
+def criar_empresa(data: Empresa):
+
+    if exists("empresa", "id", data.id):
+        raise HTTPException(409, "Empresa já existe")
+
+    conn = get_conn()
+
+    try:
+        cur = conn.cursor()
+
+        cur.execute("""
+            INSERT INTO empresa (
+                id, uuid, cnpj, razaoSocial, nomeFantasia,
+                municipio, uf, cnae, ativo, bloqueado,
+                motivoBloqueio, plano, statusAssinatura,
+                dataInicioAssinatura, dataFimAssinatura,
+                origemAssinatura, dataCadastro, dataAtualizacao,
+                sincronizado
+            )
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                    %s,%s,%s,%s,%s,%s,%s,%s,%s)
+        """, (
+            data.id,
+            data.uuid,
+            data.cnpj,
+            data.razaoSocial,
+            data.nomeFantasia,
+            data.municipio,
+            data.uf,
+            data.cnae,
+            data.ativo,
+            data.bloqueado,
+            data.motivoBloqueio,
+            data.plano,
+            data.statusAssinatura,
+            data.dataInicioAssinatura,
+            data.dataFimAssinatura,
+            data.origemAssinatura,
+            data.dataCadastro,
+            data.dataAtualizacao,
+            data.sincronizado
+        ))
+
+        conn.commit()
+
+        return {"status": "ok", "mensagem": "Empresa criada"}
+
+    finally:
+        put_conn(conn)
+        
+
+@app.delete("/empresa/{id}")
+def deletar_empresa(id: str):
+
+    if not exists("empresa", "id", id):
+        raise HTTPException(404, "Empresa não encontrada")
+
+    conn = get_conn()
+
+    try:
+        cur = conn.cursor()
+
+        cur.execute("""
+            DELETE FROM empresa
+            WHERE id = %s
+        """, (id,))
+
+        conn.commit()
+
+        return {"status": "ok", "mensagem": "Empresa deletada"}
+
+    finally:
+        put_conn(conn)

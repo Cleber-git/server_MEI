@@ -102,6 +102,8 @@ class Empresa(BaseModel):
     origemAssinatura: Optional[str] = None
     dataCadastro: Optional[str] = None
     dataAtualizacao: Optional[str] = None
+    sincronizado: bool
+    
 
 class getEmpresa(BaseModel):
     nomeFantasia : str
