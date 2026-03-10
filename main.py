@@ -998,8 +998,7 @@ def delete_usuario(uuid: str):
         
         
         
-from fastapi import HTTPException
-import hashlib
+
 
 @app.post("/login", response_model=loginResponse)
 def login(data: loginIn):
@@ -1090,6 +1089,51 @@ def login(data: loginIn):
             usuario=usuario_obj,
             empresa=empresa_obj
         )
+
+    finally:
+        put_conn(conn)
+        
+@app.post("/validaEmail")
+def validar_email(data: ValidarEmailIn):
+
+    conn = get_conn()
+
+    try:
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT valida
+            FROM validationEmail
+            WHERE email = %s AND codigo = %s
+        """, (data.email, data.codigo))
+
+        row = cur.fetchone()
+
+        if not row:
+            return {
+                "sucesso": False,
+                "mensagem": "Código ou email inválido"
+            }
+
+        if not row[0]:
+            return {
+                "sucesso": False,
+                "mensagem": "Código já utilizado"
+            }
+
+        # marcar como usado
+        cur.execute("""
+            UPDATE validationEmail
+            SET valida = FALSE
+            WHERE email = %s AND codigo = %s
+        """, (data.email, data.codigo))
+
+        conn.commit()
+
+        return {
+            "sucesso": True,
+            "mensagem": "Email validado com sucesso"
+        }
 
     finally:
         put_conn(conn)

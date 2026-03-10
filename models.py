@@ -136,5 +136,6 @@ class loginResponse(BaseModel):
     empresa : Empresa
     
     
-    
-    
+class ValidarEmailIn(BaseModel):
+    email: str
+    codigo: str
