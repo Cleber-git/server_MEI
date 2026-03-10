@@ -1094,7 +1094,7 @@ def login(data: loginIn):
         put_conn(conn)
         
 @app.post("/validaEmail")
-def validar_email(data: ValidarEmailIn):
+def validaEmail(data: ValidarEmailIn):
 
     conn = get_conn()
 
