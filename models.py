@@ -128,7 +128,7 @@ class Usuario(BaseModel):
     empresaUuid: str
     ativo: bool
     dataCadastro: int
-    ultimoLogin: int
+    ultimoLogin: Opitional[int] = None
     
 class loginResponse(BaseModel):
     sucesso:str

@@ -906,7 +906,7 @@ def receber_email(email: receiverEmail):
 @app.post("/usuarios")
 def create_usuario(data: Usuario):
 
-    if exists("usuario", "uuid", data.uuid):
+    if exists("usuario", "uuid", data.uuid) :
         raise HTTPException(409, "Usuário já existe")
 
     conn = get_conn()
