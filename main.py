@@ -1030,7 +1030,7 @@ def login(data: loginIn):
         # buscar usuário pelo email
         cur.execute("""
             SELECT uuid, email, senhahash, nome, empresauuid, ativo, datacadastro, ultimologin
-            FROM usuario
+            FROM usuarioMei
             WHERE email = %s
         """, (data.login,))
 
@@ -1040,7 +1040,7 @@ def login(data: loginIn):
         if not user:
             cur.execute("""
                 SELECT u.uuid, u.email, u.senhahash, u.nome, u.empresauuid, u.ativo, u.datacadastro, u.ultimologin
-                FROM usuario u
+                FROM usuarioMei u
                 JOIN empresa e ON e.uuid = u.empresauuid
                 WHERE e.cnpj = %s
             """, (data.login,))
@@ -1160,8 +1160,9 @@ def validaEmail(data: ValidarEmailIn):
         
 @app.post("/empresa")
 def criar_empresa(data: Empresa):
+    """cadastrar empresa na base de dados"""
 
-    if exists("empresa", "id", data.id):
+    if exists("empresa", "id", data.id) or exists("empresa", "cnpj", data.cnpj):
         raise HTTPException(409, "Empresa já existe")
 
     conn = get_conn()
