@@ -1417,3 +1417,48 @@ def redefinir_senha(valida: ValidarSenha):
         put_conn(conn)
     
     
+@app.get("/servico/{id}", response_model=ServicoIn)
+def get_servico(id: str):
+    
+    conn = get_conn()
+    
+    try:
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT id,
+                   empresauuid,
+                   nome,
+                   preco,
+                   preco_anterior,
+                   data_criacao,
+                   tipo,
+                   pendentesync,
+                   atualizadoem,
+                   deletado
+            FROM public.servico
+            WHERE id = %s
+        """, (id,))
+
+        row = cur.fetchone()
+
+        if not row:
+            raise HTTPException(404, "Serviço não encontrado")
+
+        servico = {
+            "id": row[0],
+            "empresaUuid": row[1],
+            "nome": row[2],
+            "preco": float(row[3]),
+            "precoAnterior": float(row[4]) if row[4] else 0,
+            "dataCriacao": row[5],
+            "tipo": row[6],
+            "pendenteSync": row[7],
+            "atualizadoEm": row[8],
+            "deletado": row[9]
+        }
+
+        return servico
+
+    finally:
+        put_conn(conn)
