@@ -31,10 +31,9 @@ app = FastAPI()
 @app.middleware("http")
 async def validar_empresa(request: Request, call_next):
 
-    # =============================
-    # ROTA ESPECIAL: criar empresa
-    # =============================
-    if request.method == "POST" and request.url.path == "/empresa":
+    path = request.url.path.rstrip("/")
+
+    if request.method == "POST" and path == "/empresa":
 
         chave = request.headers.get("validation-uuid")
         chave_env = os.getenv("key_first_acess")
@@ -47,9 +46,6 @@ async def validar_empresa(request: Request, call_next):
 
         return await call_next(request)
 
-    # =========================
-    # VALIDAÇÃO NORMAL
-    # =========================
     empresa_uuid = request.headers.get("validation-uuid")
 
     if not empresa_uuid:
@@ -64,28 +60,21 @@ async def validar_empresa(request: Request, call_next):
         cur = conn.cursor()
 
         cur.execute("""
-            SELECT 1
-            FROM empresa
-            WHERE uuid = %s
-            LIMIT 1
+            SELECT 1 FROM empresa WHERE uuid = %s LIMIT 1
         """, (empresa_uuid,))
 
-        row = cur.fetchone()
-
-        if not row:
+        if not cur.fetchone():
             return JSONResponse(
                 status_code=401,
                 content={"detail": "Empresa não autorizada"}
             )
 
-        # guardar para usar na endpoint
         request.state.empresa_uuid = empresa_uuid
 
     finally:
         put_conn(conn)
 
-    response = await call_next(request)
-    return response
+    return await call_next(request)
 # app.include_router(email_routes)
 
 # def create_access_token(data: dict):
