@@ -1400,7 +1400,7 @@ def redefinir_senha(valida: ValidarSenha):
         # marcar como usado
         cur.execute("""
             UPDATE usuariomei
-            SET senha = %s
+            SET senhahash = %s
             WHERE email = %s
         """, (valida.novaSenha, valida.email))
 
