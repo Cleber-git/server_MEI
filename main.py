@@ -1120,7 +1120,7 @@ def login(data: loginIn):
         # senha_hash = hashlib.sha256(data.senha.encode()).hexdigest()
 
         if data.senha != user[2]:
-            raise HTTPException(401, "Senha incorreta")
+            raise HTTPException(402, "Senha incorreta")
 
         # buscar empresa
         cur.execute("""
