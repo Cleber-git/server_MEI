@@ -14,12 +14,12 @@ import re
 from email_ import email_service
 import requests
 
-import base64
 from email.mime.text import MIMEText
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
-import pickle
+
+
 
 # SECRET_KEY = "minha_chave_super_secreta_123"
 # ALGORITHM = "HS256"
@@ -27,6 +27,50 @@ import pickle
 
 app = FastAPI()
 
+@app.middleware("http")
+async def validar_empresa(request: Request, call_next):
+
+    # rota especial
+    if request.method == "POST" and request.url.path == "/empresa":
+        chave = request.headers.get("validation-uuid")
+        chave_env = os.getenv("key_first_acess")
+
+        if chave != chave_env:
+            raise HTTPException(401, "Não autorizado para criar empresa")
+
+        return await call_next(request)
+    # ===========================================================================
+
+    empresa_uuid = request.headers.get("validation-uuid")
+
+    if not empresa_uuid:
+        raise HTTPException(401, "Header empresauuid não informado")
+
+    conn = get_conn()
+
+    try:
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT 1
+            FROM empresa
+            WHERE uuid = %s
+            LIMIT 1
+        """, (empresa_uuid,))
+
+        row = cur.fetchone()
+
+        if not row:
+            raise HTTPException(401, "Empresa não autorizada")
+
+        # opcional: guardar para usar nas endpoints
+        request.state.empresa_uuid = empresa_uuid
+
+    finally:
+        put_conn(conn)
+
+    response = await call_next(request)
+    return response
 # app.include_router(email_routes)
 
 # def create_access_token(data: dict):
@@ -34,7 +78,6 @@ app = FastAPI()
 #     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 #     to_encode.update({"exp": expire})
 #     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-
 
 @app.get("/")
 def read_root():
@@ -152,8 +195,8 @@ def create_tables():
     nome TEXT,
     empresauuid TEXT,
     ativo BOOLEAN,
-    datacadastro INTEGER,
-    ultimologin INTEGER
+    datacadastro BIGINT,
+    ultimologin BIGINT
 )
 """)
         
@@ -188,7 +231,7 @@ def create_tables():
     finally:
         if conn:
             put_conn(conn) # LIBERTA A CONEXÃO MESMO COM ERRO 
-        
+
 def exists(table: str, field: str, value: str) -> bool:
     conn = get_conn()
     try:
@@ -741,6 +784,7 @@ def delete_debito_cliente(id: str):
 def criar_empresa(empresa:Empresa):
     if exists("empresa", "uuid", empresa.uuid):
         raise HTTPException(409, "Empresa já cadastrada")
+    
 
     conn = get_conn()
     try:
@@ -779,6 +823,8 @@ def criar_empresa(empresa:Empresa):
         
 @app.get("/empresa")
 def get_empresa():
+    TOKEN_API = os.getenv('key_first_acess')
+     
     conn = get_conn()
     try:
         cur = conn.cursor()
