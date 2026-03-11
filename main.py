@@ -33,7 +33,7 @@ async def validar_empresa(request: Request, call_next):
 
     path = request.url.path.rstrip("/")
 
-    if request.method == "POST" and path == "/empresa" or path == "/email" or path == "/validaEmail":
+    if request.method == "POST" and path == "/empresa" or path == "/email" or path == "/validaEmail" or path == "/redefinirSenha" or path == "/codigoSenha":
 
         chave = request.headers.get("validation-uuid")
         chave_env = os.getenv("key_first_acess")
@@ -1181,7 +1181,6 @@ def login(data: loginIn):
         
 @app.post("/validaEmail")
 def validaEmail(data: ValidarEmailIn):
-
     conn = get_conn()
 
     try:
@@ -1276,7 +1275,6 @@ def criar_empresa(data: Empresa):
     finally:
         put_conn(conn)
         
-
 @app.delete("/empresa/{id}")
 def deletar_empresa(id: str):
 
@@ -1299,3 +1297,120 @@ def deletar_empresa(id: str):
 
     finally:
         put_conn(conn)
+        
+@app.post("/codigoSenha")
+def get_senha(email: str):
+    """EndPoint para recuperar senha"""
+    if exists("usuarioMei", "email", email) == False:
+        raise HTTPException(404, "Email inexistente")
+    
+    codigo = randrange(100000, 999999)
+    
+    conn = get_conn()
+
+    try:
+        cur = conn.cursor()
+
+        cur.execute(
+            """
+            INSERT INTO validationEmail (email, codigo, valida)
+        VALUES (%s, %s, %s)
+            """,    
+            (email, str(codigo), True)
+        )
+
+        conn.commit()
+   
+        mensagem = f"""
+        <div style="background:#f4f6f8;padding:40px 20px;font-family:Arial,sans-serif;">
+            
+            <div style="
+                max-width:500px;
+                margin:auto;
+                background:white;
+                border-radius:10px;
+                padding:30px;
+                text-align:center;
+                box-shadow:0 4px 12px rgba(0,0,0,0.1);
+            ">
+
+                <h2 style="color:red;margin-bottom:10px;">
+                    Verificação de Email
+                </h2>
+
+                <p style="color:#fff;font-size:15px;">
+                    Para redefinir sua senha de acesso, utilize o código abaixo:
+                </p>
+
+                <div style="
+                    font-size:32px;
+                    letter-spacing:6px;
+                    font-weight:bold;
+                    color:white;
+                    background:#1cc7b5;
+                    padding:15px;
+                    border-radius:8px;
+                    margin:25px 0;
+                ">
+                    {codigo}
+                </div>
+
+                <p style="color:#666;font-size:14px;">
+                    Este código é válido por tempo limitado.
+            </p>
+
+                <hr style="margin:25px 0;border:none;border-top:1px solid #eee;">
+
+                <p style="font-size:13px;color:#888;">
+                    Caso você não tenha solicitado esta verificação,<br>
+                    ignore esta mensagem.
+                </p>
+
+                <p style="margin-top:25px;font-weight:bold;color:#0b4a47;">
+                    Equipe Caltech
+                </p>
+
+            </div>
+
+        </div>
+    """
+        print(os.getenv("EMAIL_USER"))
+        print(os.getenv("EMAIL_PASSWORD"))
+        enviado = email_service.enviar_email(
+            email,
+            "Código para redefinir senha",
+            mensagem
+            )
+        
+        if enviado:
+            return {"sucesso": True, "mensagem": "Email para redefinir senha enviado com sucesso"}
+        else:
+            return {"sucesso": False, "mensagem": "Falha ao enviar email para redefinir senha"}
+
+    finally:
+        put_conn(conn)    
+        
+@app.post("/redefinirSenha")
+def redefinir_senha(valida: ValidarSenha):
+    conn = get_conn()
+
+    try:
+        cur = conn.cursor()
+
+        # marcar como usado
+        cur.execute("""
+            UPDATE usuariomei
+            SET senha = %s
+            WHERE email = %s
+        """, (valida.novaSenha, valida.email))
+
+        conn.commit()
+
+        return {
+            "sucesso": True,
+            "mensagem": "Senha redefinida com sucesso"
+        }
+
+    finally:
+        put_conn(conn)
+    

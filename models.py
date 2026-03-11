@@ -140,3 +140,7 @@ class loginResponse(BaseModel):
 class ValidarEmailIn(BaseModel):
     email: str
     codigo: str
+    
+class ValidarSenha(BaseModel):
+    email:str
+    novaSenha: str
