@@ -18,6 +18,7 @@ from email.mime.text import MIMEText
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
+from fastapi.responses import JSONResponse
 
 
 
@@ -30,21 +31,32 @@ app = FastAPI()
 @app.middleware("http")
 async def validar_empresa(request: Request, call_next):
 
-    # rota especial
+    # =============================
+    # ROTA ESPECIAL: criar empresa
+    # =============================
     if request.method == "POST" and request.url.path == "/empresa":
+
         chave = request.headers.get("validation-uuid")
         chave_env = os.getenv("key_first_acess")
 
         if chave != chave_env:
-            raise HTTPException(401, "Não autorizado para criar empresa")
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Não autorizado para criar empresa"}
+            )
 
         return await call_next(request)
-    # ===========================================================================
 
+    # =========================
+    # VALIDAÇÃO NORMAL
+    # =========================
     empresa_uuid = request.headers.get("validation-uuid")
 
     if not empresa_uuid:
-        raise HTTPException(401, "Header empresauuid não informado")
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Header validation-uuid não informado"}
+        )
 
     conn = get_conn()
 
@@ -61,9 +73,12 @@ async def validar_empresa(request: Request, call_next):
         row = cur.fetchone()
 
         if not row:
-            raise HTTPException(401, "Empresa não autorizada")
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Empresa não autorizada"}
+            )
 
-        # opcional: guardar para usar nas endpoints
+        # guardar para usar na endpoint
         request.state.empresa_uuid = empresa_uuid
 
     finally:
