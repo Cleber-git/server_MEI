@@ -1127,7 +1127,7 @@ def login(data: loginIn):
             SELECT id, uuid, cnpj, razaosocial, nomefantasia, municipio, uf,
                    cnae, ativo, bloqueado, motivobloqueio, plano,
                    statusassinatura, datainicioassinatura, datafimassinatura,
-                   origemassinatura, datacadastro, dataatualizacao
+                   origemassinatura, datacadastro, dataatualizacao, sincronizado
             FROM empresa
             WHERE uuid = %s
         """, (user[4],))
@@ -1145,7 +1145,8 @@ def login(data: loginIn):
             empresaUuid=user[4],
             ativo=user[5],
             dataCadastro=user[6],
-            ultimoLogin=user[7]
+            ultimoLogin=user[7],
+            
         )
 
         empresa_obj = Empresa(
@@ -1166,7 +1167,8 @@ def login(data: loginIn):
             dataFimAssinatura=emp[14],
             origemAssinatura=emp[15],
             dataCadastro=emp[16],
-            dataAtualizacao=emp[17]
+            dataAtualizacao=emp[17],
+            sincronizado=emp[18]
         )
 
         return loginResponse(
