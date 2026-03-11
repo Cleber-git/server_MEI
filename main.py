@@ -1172,7 +1172,7 @@ def login(data: loginIn):
         )
 
         return loginResponse(
-            sucesso= True,
+            sucesso= "True",
             mensagem="Login realizado com sucesso",
             usuario=usuario_obj,
             empresa=empresa_obj
