@@ -39,7 +39,7 @@ class ServicoIn(BaseModel):
     nome: str
     preco: float
     precoAnterior: float
-    dataCriacao: int = None
+    dataCriacao: str = None
     tipo: Optional[str] = None
     pendenteSync: bool
     atualizadoEm: int
