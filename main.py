@@ -659,7 +659,16 @@ def create_pagamento(data: PagamentoIn):
             VALUES (%s,%s,%s,%s, %s, %s, %s,%s)
         """, (
             # data.id, data.data, data.valor, data.motivo
-            data.model_dump
+            (
+    data.id,
+    data.empresaUuid,
+    data.data,
+    data.valor,
+    data.motivo,
+    data.atualizadoEm,
+    data.pendenteSync,
+    data.deletado
+)
         ))
         conn.commit()
         return {"status": "ok"}
