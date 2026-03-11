@@ -658,7 +658,6 @@ def create_pagamento(data: PagamentoIn):
             (id, empresauuid, data, valor, motivo, atualizadoem, pendentesync, deletado)
             VALUES (%s,%s,%s,%s, %s, %s, %s,%s)
         """, (
-            # data.id, data.data, data.valor, data.motivo
             (
     data.id,
     data.empresaUuid,
@@ -697,12 +696,12 @@ def update_pagamento(data: PagamentoIn):
                 deletado = %s
             WHERE id = %s
         """, (
-            data.empresauuid,
+            data.empresaUuid,
             data.data,
             data.valor,
             data.motivo,
-            data.atualizadoem,
-            data.pendentesync,
+            data.atualizadoEm,
+            data.pendenteSync,
             data.deletado,
             data.id
         ))
