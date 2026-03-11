@@ -33,7 +33,7 @@ async def validar_empresa(request: Request, call_next):
 
     path = request.url.path.rstrip("/")
 
-    if request.method == "POST" and path == "/empresa":
+    if request.method == "POST" and path == "/empresa" or path == "/email" or path == "/validaEmail":
 
         chave = request.headers.get("validation-uuid")
         chave_env = os.getenv("key_first_acess")
