@@ -1299,9 +1299,9 @@ def deletar_empresa(id: str):
         put_conn(conn)
         
 @app.post("/codigoSenha")
-def get_senha(email: str):
+def get_senha(email: receiverEmail):
     """EndPoint para recuperar senha"""
-    if exists("usuarioMei", "email", email) == False:
+    if exists("usuarioMei", "email", email.email) == False:
         raise HTTPException(404, "Email inexistente")
     
     codigo = randrange(100000, 999999)
@@ -1316,7 +1316,7 @@ def get_senha(email: str):
             INSERT INTO validationEmail (email, codigo, valida)
         VALUES (%s, %s, %s)
             """,    
-            (email, str(codigo), True)
+            (email.email, str(codigo), True)
         )
 
         conn.commit()
@@ -1377,7 +1377,7 @@ def get_senha(email: str):
         print(os.getenv("EMAIL_USER"))
         print(os.getenv("EMAIL_PASSWORD"))
         enviado = email_service.enviar_email(
-            email,
+            email.email,
             "Código para redefinir senha",
             mensagem
             )
