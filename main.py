@@ -1154,7 +1154,7 @@ def deletar_empresa(id: str):
 
         # Deleta usuários da empresa
         cur.execute("""
-            DELETE FROM usuario
+            DELETE FROM usuariomei
             WHERE empresauuid = %s
         """, (id,))
 
