@@ -28,13 +28,25 @@ from fastapi.responses import JSONResponse
 
 app = FastAPI()
 
+
 @app.middleware("http")
 async def validar_empresa(request: Request, call_next):
 
     path = request.url.path.rstrip("/")
+    if path == "/venda-completa":
+        body = await request.body()
+        print(body)
+        
+    rotas_publicas = [
+        "/empresa",
+        "/email",
+        "/validaEmail",
+        "/redefinirSenha",
+        "/codigoSenha",
+        "/login"
+    ]
 
-    if request.method == "POST" and path == "/empresa" or path == "/email" or path == "/validaEmail" or path == "/redefinirSenha" or path == "/codigoSenha" or path == "/login":
-
+    if request.method == "POST" and path in rotas_publicas:
         chave = request.headers.get("validation-uuid")
         chave_env = os.getenv("key_first_acess")
 
