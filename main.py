@@ -326,8 +326,8 @@ def list_clientes():
                 deletado=r[9]
             ))
             
-            print("Clientes: ", clientes)
-            return clientes
+        print("Clientes: ", clientes)
+        return clientes
     finally:
         put_conn(conn)
 
