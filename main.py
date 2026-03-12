@@ -1082,17 +1082,16 @@ def criar_empresa(data: Empresa):
 
         cur.execute("""
             INSERT INTO empresa (
-                id, uuid, cnpj, razaoSocial, nomeFantasia,
+                uuid, cnpj, razaoSocial, nomeFantasia,
                 municipio, uf, cnae, ativo, bloqueado,
                 motivoBloqueio, plano, statusAssinatura,
                 dataInicioAssinatura, dataFimAssinatura,
                 origemAssinatura, dataCadastro, dataAtualizacao,
                 sincronizado
             )
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,
                     %s,%s,%s,%s,%s,%s,%s,%s,%s)
         """, (
-            data.id,
             data.uuid,
             data.cnpj,
             data.razaoSocial,
