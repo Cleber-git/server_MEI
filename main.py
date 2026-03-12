@@ -810,7 +810,6 @@ def create_debito_cliente(data: DebitoClienteIn):
     finally:
         put_conn(conn)
 
-
 @app.get("/debitos-cliente")
 def list_debitos_cliente():
     conn = get_conn()
@@ -835,11 +834,50 @@ def list_debitos_cliente():
     finally:
         put_conn(conn)
 
-
 @app.delete("/debitos-cliente/{id}")
 def delete_debito_cliente(id: str):
     return delete_by_id("debitosclienteEty", id)
 
+@app.put("/debitos-cliente")
+def update_debito_cliente(data: DebitoClienteIn):
+
+    if not exists("debitosclienteEty", "id", data.id):
+        raise HTTPException(404, "Débito não encontrado")
+
+    conn = get_conn()
+
+    try:
+        cur = conn.cursor()
+
+        cur.execute("""
+            UPDATE debitosclienteEty
+            SET empresauuid = %s,
+                codigo_cliente = %s,
+                periodo = %s,
+                valor = %s,
+                situacao = %s,
+                atualizadoem = %s,
+                pendentesync = %s,
+                deletado = %s
+            WHERE id = %s
+        """, (
+            data.empresaUuid,
+            data.codigoCliente,
+            data.periodo,
+            data.valor,
+            data.situacao,
+            data.atualizadoEm,
+            data.pendenteSync,
+            data.deletado,
+            data.id
+        ))
+
+        conn.commit()
+
+        return {"status": "atualizado"}
+
+    finally:
+        put_conn(conn)
 
 # Criar empresa
 @app.post("/empresa")
