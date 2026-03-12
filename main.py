@@ -313,7 +313,7 @@ def list_clientes():
 
         for r in rows:
             clientes.append(ClienteIn(
-                uuid=r[0],
+                id=r[0],
                 empresaUuid=r[1],
                 nome=r[2],
                 telefone=r[3],

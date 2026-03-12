@@ -3,7 +3,7 @@ from typing import Optional
 
 
 class ClienteIn(BaseModel):
-    uuid: str
+    id: str
     empresaUuid: str
     nome: str
     telefone: Optional[str] = None
