@@ -486,21 +486,21 @@ def create_venda_completa(data: VendaCompletaIn):
                 item.quantidade
             ))
 
-        # -------- PDF --------
-        if not exists("pdfvenda", "id", data.pdf.id):
+        # # -------- PDF --------
+        # if not exists("pdfvenda", "id", data.pdf.id):
 
-            cur.execute("""
-                INSERT INTO pdfvenda
-                (id, empresauuid, venda_id, caminho_pdf, data_geracao, hora_geracao)
-                VALUES (%s,%s,%s,%s,%s,%s)
-            """, (
-                data.pdf.id,
-                data.pdf.empresaUuid,
-                data.pdf.vendaId,
-                data.pdf.caminhoPdf,
-                data.pdf.dataGeracao,
-                data.pdf.horaGeracao
-            ))
+        #     cur.execute("""
+        #         INSERT INTO pdfvenda
+        #         (id, empresauuid, venda_id, caminho_pdf, data_geracao, hora_geracao)
+        #         VALUES (%s,%s,%s,%s,%s,%s)
+        #     """, (
+        #         data.pdf.id,
+        #         data.pdf.empresaUuid,
+        #         data.pdf.vendaId,
+        #         data.pdf.caminhoPdf,
+        #         data.pdf.dataGeracao,
+        #         data.pdf.horaGeracao
+        #     ))
 
         conn.commit()
 

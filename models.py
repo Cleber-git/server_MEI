@@ -146,4 +146,3 @@ class ValidarSenha(BaseModel):
 class VendaCompletaIn(BaseModel):
     venda: VendaIn
     itens: list[ItemVendaIn]
-    pdf: PdfVendaIn
