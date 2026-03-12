@@ -257,18 +257,18 @@ def startup():
     
 @app.post("/clientes")
 def create_cliente(data: ClienteIn):
-    if exists("clientes", "id", data.uuid):
+    if exists("clientes", "id", data.id):
         raise HTTPException(409, "Cliente já existe")
     
     #     uuid: str
-    empresaUuid: str
-    nome: str
-    telefone: Optional[str] = None
-    email: Optional[str] = None
-    endereco: Optional[str] = None
-    totalDebitos: str
-    atualizadoEm : int
-    pendenteSync : bool
+    # empresaUuid: str
+    # nome: str
+    # telefone: Optional[str] = None
+    # email: Optional[str] = None
+    # endereco: Optional[str] = None
+    # totalDebitos: str
+    # atualizadoEm : int
+    # pendenteSync : bool
     # deletado: bool
 
     conn = get_conn()
@@ -278,7 +278,7 @@ def create_cliente(data: ClienteIn):
             INSERT INTO clientes (id, empresauuid, nome, telefone, email, endereco, totaldebitos, atualizadoem, pendentesync, deletado)
             VALUES (%s,%s,%s,%s,%s,%s, %s, %s, %s, %s)
         """, (
-            data.uuid, data.empresaUuid, data.nome, data.telefone,
+            data.id, data.empresaUuid, data.nome, data.telefone,
             data.email, data.endereco, data.totalDebitos, data.atualizadoEm, data.pendenteSync, data.deletado
         ))
         conn.commit()
