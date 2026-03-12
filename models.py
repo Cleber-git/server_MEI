@@ -18,20 +18,20 @@ class VendaIn(BaseModel):
     id: str
     empresaUuid: str
     formaPagamento: str
-    valor: float
+    valor: str
     data: str
     sincronizado : bool
     dataCadastro : int
     atualizadoEm : int
-    deletado : bool
+    deletado : str
     
 class ItemVendaIn(BaseModel):
     id: str
     vendaId: str
     tipo: str
     nome: str
-    valor: float
-    quantidade: int
+    valor: str
+    quantidade: str
 
 
 class ServicoIn(BaseModel):
