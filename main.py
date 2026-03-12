@@ -1072,7 +1072,7 @@ def update_debito_cliente(data: DebitoClienteIn):
 def criar_empresa(data: Empresa):
     """cadastrar empresa na base de dados"""
 
-    if exists("empresa", "id", data.id) or exists("empresa", "cnpj", data.cnpj):
+    if exists("empresa", "uuid", data.uuid) or exists("empresa", "cnpj", data.cnpj):
         raise HTTPException(409, "Empresa já existe")
 
     conn = get_conn()
