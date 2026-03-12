@@ -55,11 +55,10 @@ class PerfilIn(BaseModel):
 
 class PdfVendaIn(BaseModel):
     id: str
-    empresaUuid: str
     vendaId: str
+    empresaUuid: str
     caminhoPdf: str
-    data: Optional[str] = None
-    dataGeracao: Optional[str] = None
+    dataGeracao: int
     horaGeracao: Optional[str] = None
 
 class PagamentoIn(BaseModel):

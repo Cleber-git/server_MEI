@@ -125,15 +125,15 @@ def create_tables():
             url TEXT
             )""")
         
-        # À analisar
-        cur.execute("""CREATE TABLE IF NOT EXISTS pdfvenda(
-            id TEXT PRIMARY KEY NOT NULL,
-            venda_id text,
-            caminho_pdf text,
-            data  TEXT,
-            data_geracao TEXT,
-            hora_geracao TEXT
-            )""")
+        cur.execute("""CREATE TABLE IF NOT EXISTS pdfvenda
+(
+    id text COLLATE pg_catalog."default" NOT NULL,
+    empresaUuid text COLLATE pg_catalog."default" NOT NULL,
+    venda_id text COLLATE pg_catalog."default",
+    caminho_pdf text COLLATE pg_catalog."default",
+    data_geracao BIGINT COLLATE pg_catalog."default",
+    hora_geracao text COLLATE pg_catalog."default"
+)""")
 
         cur.execute("""CREATE TABLE IF NOT EXISTS pagamentos
 (
@@ -647,7 +647,6 @@ def get_servico(id: str):
 
     finally:
         put_conn(conn)
-
 # =====================================================================================
 
 # -------------------------------------------------------------------------------------
@@ -690,7 +689,7 @@ def delete_perfil(id: str):
 # -------------------------------------------------------------------------------------
 # PDF VENDA
 # =====================================================================================
-@app.post("/pdf-venda")
+@app.post("/pdfVenda")
 def create_pdf_venda(data: PdfVendaIn):
     if exists("pdfvenda", "id", data.id):
         raise HTTPException(409, "PDF da venda já existe")
@@ -700,31 +699,31 @@ def create_pdf_venda(data: PdfVendaIn):
         cur = conn.cursor()
         cur.execute("""
             INSERT INTO pdfvenda
-            (id, venda_id, caminho_pdf, data, data_geracao, hora_geracao)
+            (id, empresauuid, venda_id, caminho_pdf, data_geracao, hora_geracao)
             VALUES (%s,%s,%s,%s,%s,%s)
         """, (
-            data.id, data.vendaId, data.caminhoPdf,
-            data.data, data.dataGeracao, data.horaGeracao
+            data.id, data.empresaUuid, data.vendaId, data.caminhoPdf,
+            data.dataGeracao, data.horaGeracao
         ))
         conn.commit()
         return {"status": "ok"}
     finally:
         put_conn(conn)
 
-@app.get("/pdf-venda")
+@app.get("/pdfVenda")
 def list_pdf_venda():
     conn = get_conn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT * FROM pdfvenda")
+        cur.execute("SELECT id, empresauuid, venda_id, caminho_pdf, data_geracao, hora_geracao FROM pdfvenda")
         rows = cur.fetchall()
 
         return [
             PdfVendaIn(
                 id=r[0],
-                vendaId=r[1],
-                caminhoPdf=r[2],
-                data=r[3],
+                empresaUuid=r[1],
+                vendaId=r[2],
+                caminhoPdf=r[3],
                 dataGeracao=r[4],
                 horaGeracao=r[5]
             ) for r in rows
@@ -732,7 +731,7 @@ def list_pdf_venda():
     finally:
         put_conn(conn)
 
-@app.delete("/pdf-venda/{id}")
+@app.delete("/pdfVenda/{id}")
 def delete_pdf_venda(id: str):
     return delete_by_id("pdfvenda", id)
 # =====================================================================================
