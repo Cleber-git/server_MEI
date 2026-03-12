@@ -157,6 +157,7 @@ def create_tables():
         
         cur.execute("""CREATE TABLE IF NOT EXISTS clientes(
             id TEXT PRIMARY KEY NOT NULL,
+            empresauuid TEXT,
             nome TEXT,
             telefone TEXT,
             email TEXT,
@@ -324,6 +325,8 @@ def list_clientes():
                 pendenteSync=r[8],
                 deletado=r[9]
             ))
+            
+            print("Clientes: ", clientes)
             return clientes
     finally:
         put_conn(conn)
