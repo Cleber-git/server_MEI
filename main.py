@@ -259,15 +259,26 @@ def startup():
 def create_cliente(data: ClienteIn):
     if exists("clientes", "id", data.uuid):
         raise HTTPException(409, "Cliente já existe")
+    
+    #     uuid: str
+    empresaUuid: str
+    nome: str
+    telefone: Optional[str] = None
+    email: Optional[str] = None
+    endereco: Optional[str] = None
+    totalDebitos: str
+    atualizadoEm : int
+    pendenteSync : bool
+    # deletado: bool
 
     conn = get_conn()
     try:
         cur = conn.cursor()
         cur.execute("""
-            INSERT INTO clientes (id, nome, telefone, email, endereco, totaldebitos, atualizadooem, pendentesync, deletado)
-            VALUES (%s,%s,%s,%s,%s,%s, %s, %s, %s)
+            INSERT INTO clientes (id, empresauuid, nome, telefone, email, endereco, totaldebitos, atualizadooem, pendentesync, deletado)
+            VALUES (%s,%s,%s,%s,%s,%s, %s, %s, %s, %s)
         """, (
-            data.uuid, data.nome, data.telefone,
+            data.uuid, data.empresaUuid, data.nome, data.telefone,
             data.email, data.endereco, data.totalDebitos, data.atualizadoEm, data.pendenteSync, data.deletado
         ))
         conn.commit()
