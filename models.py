@@ -23,7 +23,7 @@ class VendaIn(BaseModel):
     sincronizado : bool
     dataCadastro : int
     atualizadoEm : int
-    deletado : str
+    deletado : bool
     
 class ItemVendaIn(BaseModel):
     id: str
