@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Painel de Serviços</title>
+
+<style>
+
+body{
+    margin:0;
+    font-family: "Segoe UI", sans-serif;
+    background: radial-gradient(circle at top,#0f2027,#090a0f);
+    color:#00f7ff;
+}
+
+.container{
+    width:90%;
+    margin:auto;
+    padding-top:40px;
+}
+
+h1{
+    text-align:center;
+    font-weight:300;
+    letter-spacing:3px;
+    text-shadow:0 0 10px #00f7ff;
+}
+
+.search-box{
+    text-align:center;
+    margin:30px;
+}
+
+input{
+    padding:12px;
+    width:300px;
+    border:none;
+    outline:none;
+    border-radius:30px;
+    background:#111;
+    color:#00f7ff;
+    box-shadow:0 0 10px #00f7ff inset;
+}
+
+button{
+    padding:12px 25px;
+    margin-left:10px;
+    border:none;
+    border-radius:30px;
+    background:#00f7ff;
+    color:#000;
+    cursor:pointer;
+    font-weight:bold;
+    box-shadow:0 0 10px #00f7ff;
+}
+
+button:hover{
+    background:#00c8d0;
+}
+
+.grid{
+    display:grid;
+    grid-template-columns: repeat(auto-fill,minmax(300px,1fr));
+    gap:20px;
+}
+
+.card{
+    background:#000;
+    border-radius:12px;
+    padding:20px;
+    box-shadow:
+        0 0 10px #00f7ff,
+        0 0 20px rgba(0,247,255,0.3);
+    transition:0.3s;
+}
+
+.card:hover{
+    transform:scale(1.05);
+    box-shadow:
+        0 0 15px #00f7ff,
+        0 0 40px rgba(0,247,255,0.6);
+}
+
+.nome{
+    font-size:20px;
+    margin-bottom:10px;
+}
+
+.preco{
+    color:#00ffa2;
+    font-size:18px;
+}
+
+.id{
+    font-size:12px;
+    color:#888;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>PAINEL DE SERVIÇOS</h1>
+
+<div class="search-box">
+<input id="busca" placeholder="Buscar serviço...">
+<button onclick="buscar()">Buscar</button>
+</div>
+
+<div id="lista" class="grid"></div>
+
+</div>
+
+<script>
+
+const API = "https://SEU-SERVIDOR.onrender.com/servicos"; // coloque sua URL
+
+async function carregar(){
+
+    const res = await fetch(API)
+    const data = await res.json()
+
+    mostrar(data)
+
+}
+
+function mostrar(servicos){
+
+    const lista = document.getElementById("lista")
+    lista.innerHTML=""
+
+    servicos.forEach(s => {
+
+        const card = document.createElement("div")
+        card.className="card"
+
+        card.innerHTML=`
+            <div class="nome">${s.nome}</div>
+            <div class="preco">R$ ${s.preco}</div>
+            <div class="id">ID: ${s.id}</div>
+        `
+
+        lista.appendChild(card)
+
+    })
+
+}
+
+async function buscar(){
+
+    const termo = document.getElementById("busca").value.toLowerCase()
+
+    const res = await fetch(API)
+    const data = await res.json()
+
+    const filtrado = data.filter(s =>
+        s.nome.toLowerCase().includes(termo)
+    )
+
+    mostrar(filtrado)
+
+}
+
+carregar()
+
+</script>
+
+</body>
+</html>
