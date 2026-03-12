@@ -78,10 +78,11 @@ class DebitoClienteIn(BaseModel):
     empresaUuid: str
     codigoCliente: str
     periodo: str
-    valor: float
+    valor: str
     situacao: str
-
-
+    atualizadoEm: int
+    pendenteSync: bool
+    deletado: bool
 
 class Empresa(BaseModel):
     uuid: Optional[str] = None

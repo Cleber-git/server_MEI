@@ -231,6 +231,19 @@ def create_tables():
             sincronizado boolean 
         )""")
         
+        cur.execute("""CREATE TABLE IF NOT EXISTS public.debitosclienteety
+        (
+            id text COLLATE pg_catalog."default" NOT NULL,
+            empresauuid text COLLATE pg_catalog."default" NOT NULL,
+            codigo_cliente text COLLATE pg_catalog."default",
+            periodo text COLLATE pg_catalog."default",
+            valor text COLLATE pg_catalog."default",
+            situacao text COLLATE pg_catalog."default",
+            atualizadoem bigint,
+            pendentesync boolean DEFAULT true,
+            deletado boolean DEFAULT false
+            )""")
+        
         conn.commit()
         print("Tabelas criadas com sucesso")
     except Exception as e:
@@ -786,11 +799,11 @@ def create_debito_cliente(data: DebitoClienteIn):
         cur = conn.cursor()
         cur.execute("""
             INSERT INTO debitosclienteEty
-            (id, codigo_cliente, periodo, valor, situacao)
-            VALUES (%s,%s,%s,%s,%s)
+            (id, codigo_cliente, periodo, valor, situacao, atualizadoem, pendentesync, deletado)
+            VALUES (%s,%s,%s,%s,%s, %s, %s, %s)
         """, (
             data.id, data.codigoCliente,
-            data.periodo, data.valor, data.situacao
+            data.periodo, data.valor, data.situacao, data.atualizadoEm, data.pendenteSync, data.deletado
         ))
         conn.commit()
         return {"status": "ok"}
@@ -813,7 +826,10 @@ def list_debitos_cliente():
                 codigoCliente=r[2],
                 periodo=r[3],
                 valor=r[4],
-                situacao=r[5]
+                situacao=r[5],
+                atualizadoEm=r[6],
+                pendenteSync=r[7],
+                deletado=r[8]
             ) for r in rows
         ]
     finally:
