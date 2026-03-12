@@ -275,7 +275,7 @@ def create_cliente(data: ClienteIn):
     try:
         cur = conn.cursor()
         cur.execute("""
-            INSERT INTO clientes (id, empresauuid, nome, telefone, email, endereco, totaldebitos, atualizadooem, pendentesync, deletado)
+            INSERT INTO clientes (id, empresauuid, nome, telefone, email, endereco, totaldebitos, atualizadoem, pendentesync, deletado)
             VALUES (%s,%s,%s,%s,%s,%s, %s, %s, %s, %s)
         """, (
             data.uuid, data.empresaUuid, data.nome, data.telefone,
