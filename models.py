@@ -31,7 +31,7 @@ class ItemVendaIn(BaseModel):
     tipo: str
     nome: str
     valor: float
-    quantidade: str
+    quantidade: int
 
 
 class ServicoIn(BaseModel):
