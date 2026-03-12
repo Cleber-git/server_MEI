@@ -117,7 +117,7 @@ def create_tables():
     tipo text COLLATE pg_catalog."default",
     pendentesync boolean,
     atualizadoem bigint,
-    deletado boolean,
+    deletado boolean
 )""")
         
         cur.execute("""CREATE TABLE IF NOT EXISTS perfil(
@@ -225,8 +225,8 @@ def create_tables():
     empresauuid text COLLATE pg_catalog."default",
     ativo boolean,
     datacadastro bigint,
-    ultimologin bigint)
-""")
+    ultimologin bigint
+)""")
 
         
         conn.commit()
