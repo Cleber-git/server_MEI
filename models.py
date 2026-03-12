@@ -27,7 +27,6 @@ class VendaIn(BaseModel):
     
 class ItemVendaIn(BaseModel):
     id: str
-    empresaUuid: str
     vendaId: str
     tipo: str
     nome: str

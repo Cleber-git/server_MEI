@@ -147,15 +147,15 @@ def create_tables():
     deletado boolean
     )""")
         
-        # À analisar
-        cur.execute("""CREATE TABLE IF NOT EXISTS itenvendas(
-            id TEXT PRIMARY KEY NOT NULL,
-            venda_id TEXT,
-            tipo TEXT,
-            nome TEXT,
-            valor DECIMAL(10,2),
-            quantidade INTEGER
-            )""")
+        cur.execute("""CREATE TABLE IF NOT EXISTS itenvendas
+(
+    id text COLLATE pg_catalog."default" NOT NULL,
+    venda_id text COLLATE pg_catalog."default",
+    tipo text COLLATE pg_catalog."default",
+    nome text COLLATE pg_catalog."default",
+    valor numeric(10,2),
+    quantidade integer
+)""")
         
         cur.execute("""CREATE TABLE IF NOT EXISTS debitosclienteety
 (
@@ -430,7 +430,7 @@ def delete_venda(id: str):
 # -------------------------------------------------------------------------------------
 # ITENS VENDA
 # =====================================================================================
-@app.post("/itensVenda")
+@app.post("/vendas/itens")
 def create_item_venda(data: ItemVendaIn):
     if not exists("venda", "id", data.vendaId):
         raise HTTPException(404, "Venda não encontrada")
@@ -454,7 +454,7 @@ def create_item_venda(data: ItemVendaIn):
     finally:
         put_conn(conn)
 
-@app.get("/itensVenda")
+@app.get("/vendas/itens")
 def list_itens_venda(vendaId: str):
     if not exists("venda", "id", vendaId):
         raise HTTPException(404, "Venda não encontrada")
@@ -480,7 +480,7 @@ def list_itens_venda(vendaId: str):
     finally:
         put_conn(conn)
         
-@app.delete("/itensVenda/{id}")
+@app.delete("/vendas/itens/{id}")
 def delete_item_venda(id: str):
     return delete_by_id("itenvendas", id)
 # =====================================================================================
