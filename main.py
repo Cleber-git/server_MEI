@@ -396,7 +396,7 @@ def list_vendas():
     conn = get_conn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT id, empresauuid, formapagamento, valor, data, sincronizado, datacadastro, atualizadoem, deletado FROM venda")
+        cur.execute("SELECT id, empresauuid, forma_pagamento, valor, data, sincronizado, datacadastro, atualizadoem, deletado FROM venda")
         
         result = cur.fetchall()
         vendas = []
