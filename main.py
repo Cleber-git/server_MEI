@@ -291,25 +291,40 @@ def list_clientes():
     conn = get_conn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT * FROM clientes")
-        row = cur.fetchall()
-        
+
+        cur.execute("""
+        SELECT
+        id,
+        empresauuid,
+        nome,
+        telefone,
+        email,
+        endereco,
+        totaldebitos,
+        atualizadoem,
+        pendentesync,
+        deletado
+        FROM clientes
+        """)
+
+        rows = cur.fetchall()
+
         clientes = []
-        
-        for r in row:
+
+        for r in rows:
             clientes.append(ClienteIn(
-                uuid= r[0], 
-                empresaUuid= r[1],
-                nome=r[2], 
-                telefone=r[3], 
-                email=r[4], 
-                endereco=r[5], 
+                id=r[0],
+                empresaUuid=r[1],
+                nome=r[2],
+                telefone=r[3],
+                email=r[4],
+                endereco=r[5],
                 totalDebitos=r[6],
-                atualizadoEm= r[7],
-                pendenteSync= r[8],
+                atualizadoEm=r[7],
+                pendenteSync=r[8],
                 deletado=r[9]
-                ))
-        return clientes
+            ))
+            return clientes
     finally:
         put_conn(conn)
 
