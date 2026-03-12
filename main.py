@@ -299,14 +299,15 @@ def list_clientes():
         for r in row:
             clientes.append(ClienteIn(
                 uuid= r[0], 
-                nome=r[1], 
-                telefone=r[2], 
-                email=r[3], 
-                endereco=r[4], 
-                totalDebitos=r[5],
-                atualizadoEm= r[6],
-                pendenteSync= r[7],
-                deletado=r[8]
+                empresaUuid= r[1],
+                nome=r[2], 
+                telefone=r[3], 
+                email=r[4], 
+                endereco=r[5], 
+                totalDebitos=r[6],
+                atualizadoEm= r[7],
+                pendenteSync= r[8],
+                deletado=r[9]
                 ))
         return clientes
     finally:
