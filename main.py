@@ -425,6 +425,82 @@ def delete_venda(id: str):
         return {"status": "ok"}
     finally:
         put_conn(conn)
+
+
+@app.post("/venda-completa")
+def create_venda_completa(data: VendaCompletaIn):
+
+    if exists("venda", "id", data.venda.id):
+        raise HTTPException(409, "Venda já existe")
+
+    conn = get_conn()
+
+    try:
+        cur = conn.cursor()
+
+        # -------- VENDA --------
+        cur.execute("""
+            INSERT INTO venda
+            (id, empresauuid, forma_pagamento, valor, data, sincronizado, datacadastro, atualizadoem, deletado)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        """, (
+            data.venda.id,
+            data.venda.empresaUuid,
+            data.venda.formaPagamento,
+            data.venda.valor,
+            data.venda.data,
+            data.venda.sincronizado,
+            data.venda.dataCadastro,
+            data.venda.atualizadoEm,
+            data.venda.deletado
+        ))
+
+        # -------- ITENS --------
+        for item in data.itens:
+
+            if exists("itenvendas", "id", item.id):
+                raise HTTPException(409, f"Item {item.id} já existe")
+
+            cur.execute("""
+                INSERT INTO itenvendas
+                (id, venda_id, tipo, nome, valor, quantidade)
+                VALUES (%s,%s,%s,%s,%s,%s)
+            """, (
+                item.id,
+                item.vendaId,
+                item.tipo,
+                item.nome,
+                item.valor,
+                item.quantidade
+            ))
+
+        # -------- PDF --------
+        if not exists("pdfvenda", "id", data.pdf.id):
+
+            cur.execute("""
+                INSERT INTO pdfvenda
+                (id, empresauuid, venda_id, caminho_pdf, data_geracao, hora_geracao)
+                VALUES (%s,%s,%s,%s,%s,%s)
+            """, (
+                data.pdf.id,
+                data.pdf.empresaUuid,
+                data.pdf.vendaId,
+                data.pdf.caminhoPdf,
+                data.pdf.dataGeracao,
+                data.pdf.horaGeracao
+            ))
+
+        conn.commit()
+
+        return {"status": "venda completa criada"}
+
+    except Exception as e:
+        conn.rollback()
+        raise e
+
+    finally:
+        put_conn(conn)
+
 # =====================================================================================
 
 # -------------------------------------------------------------------------------------

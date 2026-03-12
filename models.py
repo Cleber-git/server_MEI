@@ -53,6 +53,7 @@ class PerfilIn(BaseModel):
     empresaUuid: str
     url: str
 
+    
 class PdfVendaIn(BaseModel):
     id: str
     vendaId: str
@@ -143,3 +144,8 @@ class ValidarEmailIn(BaseModel):
 class ValidarSenha(BaseModel):
     email:str
     novaSenha: str
+    
+class VendaCompletaIn(BaseModel):
+    venda: VendaIn
+    itens: list[ItemVendaIn]
+    pdf: PdfVendaIn
