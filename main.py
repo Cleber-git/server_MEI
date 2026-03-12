@@ -542,8 +542,8 @@ def create_item_venda(data: ItemVendaIn):
 
 @app.get("/vendas/itens")
 def list_itens_venda():
-    if not exists():
-        raise HTTPException(404, "Venda não encontrada")
+    # if not exists():
+    #     raise HTTPException(404, "Venda não encontrada")
 
     conn = get_conn()
     try:
