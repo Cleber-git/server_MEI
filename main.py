@@ -541,15 +541,15 @@ def create_item_venda(data: ItemVendaIn):
         put_conn(conn)
 
 @app.get("/vendas/itens")
-def list_itens_venda(vendaId: str):
-    if not exists("venda", "id", vendaId):
+def list_itens_venda():
+    if not exists():
         raise HTTPException(404, "Venda não encontrada")
 
     conn = get_conn()
     try:
         cur = conn.cursor()
         cur.execute(
-            "SELECT * FROM itenvendas where vendaId = %s", (vendaId,)
+            "SELECT * FROM itenvendas" 
         )
         rows = cur.fetchall()
         
