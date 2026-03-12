@@ -426,11 +426,9 @@ def delete_venda(id: str):
             raise HTTPException(404, "Venda não encontrada")
 
         cur.execute(
-            "SELECT 1 FROM itenvendas WHERE venda_id = %s LIMIT 1",
+            "DELETE FROM itenvendas WHERE venda_id = %s",
             (id,)
         )
-        if cur.fetchone():
-            raise HTTPException(409, "Venda possui itens vinculados")
 
         cur.execute("DELETE FROM venda WHERE id = %s", (id,))
         conn.commit()
