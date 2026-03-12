@@ -551,7 +551,7 @@ def list_itens_venda(vendaId: str):
     try:
         cur = conn.cursor()
         cur.execute(
-            "SELECT * FROM itenvendas"
+            "SELECT * FROM itenvendas where vendaId = %s", (vendaId,)
         )
         rows = cur.fetchall()
         
