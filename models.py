@@ -32,9 +32,7 @@ class ItemVendaIn(BaseModel):
     nome: str
     valor: float
     quantidade: int
-    # sincronizado : bool
-    # dataCadastro : int
-    # atualizadoEm : int
+
 
 class ServicoIn(BaseModel):
     id: str
