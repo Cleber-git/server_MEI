@@ -14,15 +14,17 @@ class ClienteIn(BaseModel):
     pendenteSync : bool
     deletado: bool
 
-
 class VendaIn(BaseModel):
     id: str
     empresaUuid: str
     formaPagamento: str
     valor: float
     data: str
-
-
+    sincronizado : bool
+    dataCadastro : int
+    atualizadoEm : int
+    deletado : bool
+    
 class ItemVendaIn(BaseModel):
     id: str
     empresaUuid: str
@@ -31,7 +33,9 @@ class ItemVendaIn(BaseModel):
     nome: str
     valor: float
     quantidade: int
-
+    # sincronizado : bool
+    # dataCadastro : int
+    # atualizadoEm : int
 
 class ServicoIn(BaseModel):
     id: str
@@ -45,12 +49,10 @@ class ServicoIn(BaseModel):
     atualizadoEm: int
     deletado: bool
 
-
 class PerfilIn(BaseModel):
     id: str
     empresaUuid: str
     url: str
-
 
 class PdfVendaIn(BaseModel):
     id: str
@@ -61,7 +63,6 @@ class PdfVendaIn(BaseModel):
     dataGeracao: Optional[str] = None
     horaGeracao: Optional[str] = None
 
-
 class PagamentoIn(BaseModel):
     id: str
     empresaUuid: str
@@ -71,7 +72,6 @@ class PagamentoIn(BaseModel):
     atualizadoEm : int
     pendenteSync: bool
     deletado : bool
-
 
 class DebitoClienteIn(BaseModel):
     id: str

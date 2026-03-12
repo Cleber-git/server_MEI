@@ -92,31 +92,40 @@ def create_tables():
         conn = get_conn()
         cur = conn.cursor()
         
-        cur.execute("""CREATE TABLE IF NOT EXISTS venda(
-            id TEXT PRIMARY KEY NOT NULL,
-            forma_pagamento TEXT,
-            valor DECIMAL(10,2),
-            data  TEXT
-            )""")
+        cur.execute("""CREATE TABLE IF NOT EXISTS venda
+(
+    id text COLLATE pg_catalog."default" NOT NULL,
+    empresauuid text,
+    forma_pagamento text COLLATE pg_catalog."default",
+    valor numeric(10,2),
+    data text COLLATE pg_catalog."default",
+    atualizadoem bigint,
+    sincronizado boolean DEFAULT true,
+    datacadastro text COLLATE pg_catalog."default",
+    deletado boolean
+)
+            """)
         
-        cur.execute(""" CREATE TABLE IF NOT EXISTS servico(
-            id TEXT PRIMARY KEY NOT NULL,
-            empresaUuid TEXT NOT NULL,
-            nome TEXT NOT NULL,
-            preco DECIMAL(10,2),
-            preco_anterior DECIMAL(10,2),
-            data_criacao TEXT,
-            tipo TEXT, 
-            pendenteSync bool,
-            atualizadoEm INTEGER,
-            deletado bool
-        )""")
+        cur.execute("""CREATE TABLE IF NOT EXISTS servico
+(
+    id text COLLATE pg_catalog."default" NOT NULL,
+    empresauuid text COLLATE pg_catalog."default" NOT NULL,
+    nome text COLLATE pg_catalog."default" NOT NULL,
+    preco numeric(10,2),
+    preco_anterior numeric(10,2),
+    data_criacao text COLLATE pg_catalog."default",
+    tipo text COLLATE pg_catalog."default",
+    pendentesync boolean,
+    atualizadoem bigint,
+    deletado boolean,
+)""")
         
         cur.execute("""CREATE TABLE IF NOT EXISTS perfil(
             id TEXT PRIMARY KEY NOT NULL,
             url TEXT
             )""")
         
+        # À analisar
         cur.execute("""CREATE TABLE IF NOT EXISTS pdfvenda(
             id TEXT PRIMARY KEY NOT NULL,
             venda_id text,
@@ -126,17 +135,19 @@ def create_tables():
             hora_geracao TEXT
             )""")
 
-        cur.execute("""CREATE TABLE IF NOT EXISTS pagamentos(
-            id TEXT PRIMARY KEY NOT NULL,
-            empresauuid TEXT NOT NULL,
-            data  TEXT,
-            valor DECIMAL(10,2),
-            motivo TEXT,
-            atualizadoem INTEGER,
-            pendentesync bool,
-            deletado bool
-            )""")
+        cur.execute("""CREATE TABLE IF NOT EXISTS pagamentos
+(
+    id text COLLATE pg_catalog."default" NOT NULL,
+    empresauuid text COLLATE pg_catalog."default" NOT NULL,
+    data text COLLATE pg_catalog."default",
+    valor numeric(10,2),
+    motivo text COLLATE pg_catalog."default",
+    atualizadoem bigint,
+    pendentesync boolean,
+    deletado boolean
+    )""")
         
+        # À analisar
         cur.execute("""CREATE TABLE IF NOT EXISTS itenvendas(
             id TEXT PRIMARY KEY NOT NULL,
             venda_id TEXT,
@@ -146,106 +157,81 @@ def create_tables():
             quantidade INTEGER
             )""")
         
-        cur.execute("""CREATE TABLE IF NOT EXISTS debitosclienteEty(
-            id TEXT PRIMARY KEY NOT NULL,
-            empresauuid TEXT NOT NULL,
-            codigo_cliente TEXT,
-            periodo TEXT,
-            valor TEXT,
-            situacao TEXT
-            )""")
+        cur.execute("""CREATE TABLE IF NOT EXISTS debitosclienteety
+(
+    id text COLLATE pg_catalog."default" NOT NULL,
+    empresauuid text COLLATE pg_catalog."default" NOT NULL,
+    codigo_cliente text COLLATE pg_catalog."default",
+    periodo text COLLATE pg_catalog."default",
+    valor text COLLATE pg_catalog."default",
+    situacao text COLLATE pg_catalog."default",
+    atualizadoem bigint,
+    pendentesync boolean DEFAULT true,
+    deletado boolean DEFAULT false
+)""")
         
-        cur.execute("""CREATE TABLE IF NOT EXISTS clientes(
-            id TEXT PRIMARY KEY NOT NULL,
-            empresauuid TEXT,
-            nome TEXT,
-            telefone TEXT,
-            email TEXT,
-            endereco TEXT,
-            totaldebitos TEXT,
-            atualizadoEm BIGINT,
-            pendenteSync boolean,
-            deletado boolean
-            )""")
+        cur.execute("""CREATE TABLE IF NOT EXISTS clientes
+(
+    id text COLLATE pg_catalog."default" NOT NULL,
+    nome text COLLATE pg_catalog."default",
+    telefone text COLLATE pg_catalog."default",
+    email text COLLATE pg_catalog."default",
+    endereco text COLLATE pg_catalog."default",
+    totaldebitos text COLLATE pg_catalog."default",
+    atualizadoem bigint,
+    pendentesync boolean DEFAULT true,
+    deletado boolean DEFAULT false,
+    empresauuid text COLLATE pg_catalog."default"
+    
+)""")
         
-        cur.execute("""CREATE TABLE IF NOT EXISTS Empresa(
-            id TEXT PRIMARY KEY NOT NULL,
-            uuid TEXT NOT NULL,
-            cnpj TEXT,
-            razaoSocial TEXT,
-            nomefantasia TEXT,
-            municipio TEXT,
-            uf TEXT,
-            cnae TEXT,
-            ativo bool,
-            bloqueado bool,
-            motivobloqueio TEXT,
-            plano TEXT,
-            statusassinatura TEXT,
-            datainicioassinatura TEXT,
-            datafimassinatura TEXT,
-            origemassinatura TEXT,
-            datacadastro TEXT,
-            dataatualizacao TEXT
-            )""")
+        cur.execute("""CREATE TABLE IF NOT EXISTS empresa
+(
+    uuid text COLLATE pg_catalog."default" NOT NULL,
+    cnpj text COLLATE pg_catalog."default",
+    razaosocial text COLLATE pg_catalog."default",
+    nomefantasia text COLLATE pg_catalog."default",
+    municipio text COLLATE pg_catalog."default",
+    uf text COLLATE pg_catalog."default",
+    cnae text COLLATE pg_catalog."default",
+    ativo boolean,
+    bloqueado boolean,
+    motivobloqueio text COLLATE pg_catalog."default",
+    plano text COLLATE pg_catalog."default",
+    statusassinatura text COLLATE pg_catalog."default",
+    datainicioassinatura text COLLATE pg_catalog."default",
+    datafimassinatura text COLLATE pg_catalog."default",
+    origemassinatura text COLLATE pg_catalog."default",
+    datacadastro text COLLATE pg_catalog."default",
+    dataatualizacao text COLLATE pg_catalog."default",
+    sincronizado boolean DEFAULT false,
+    id bigint NOT NULL GENERATED BY DEFAULT AS IDENTITY ( INCREMENT 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 )
+    )""")
         
-        cur.execute("""CREATE TABLE IF NOT EXISTS validationEmail(
-        email TEXT NOT NULL,
-        codigo TEXT NOT NULL,
-        valida bool DEFAULT TRUE
-        )"""
+        cur.execute("""CREATE TABLE IF NOT EXISTS validationemail
+(
+    email text COLLATE pg_catalog."default" NOT NULL,
+    codigo text COLLATE pg_catalog."default" NOT NULL,
+    valida boolean DEFAULT true
+)"""
         )
         
-        cur.execute("""CREATE TABLE IF NOT EXISTS usuarioMei(
-    uuid TEXT PRIMARY KEY NOT NULL,
-    email TEXT NOT NULL,
-    senhahash TEXT NOT NULL,
-    nome TEXT,
-    empresauuid TEXT,
-    ativo BOOLEAN,
-    datacadastro BIGINT,
-    ultimologin BIGINT
-)
+        cur.execute("""CREATE TABLE IF NOT EXISTS usuariomei
+(
+    uuid text COLLATE pg_catalog."default" NOT NULL,
+    email text COLLATE pg_catalog."default" NOT NULL,
+    senhahash text COLLATE pg_catalog."default" NOT NULL,
+    nome text COLLATE pg_catalog."default",
+    empresauuid text COLLATE pg_catalog."default",
+    ativo boolean,
+    datacadastro bigint,
+    ultimologin bigint)
 """)
-        
-        cur.execute("""CREATE TABLE IF NOT EXISTS public.empresa
-        (
-            id text COLLATE pg_catalog."default" NOT NULL,
-            uuid text COLLATE pg_catalog."default" NOT NULL,
-            cnpj text COLLATE pg_catalog."default",
-            razaosocial text COLLATE pg_catalog."default",
-            nomefantasia text COLLATE pg_catalog."default",
-            municipio text COLLATE pg_catalog."default",
-            uf text COLLATE pg_catalog."default",
-            cnae text COLLATE pg_catalog."default",
-            ativo boolean,
-            bloqueado boolean,
-            motivobloqueio text COLLATE pg_catalog."default",
-            plano text COLLATE pg_catalog."default",
-            statusassinatura text COLLATE pg_catalog."default",
-            datainicioassinatura text COLLATE pg_catalog."default",
-            datafimassinatura text COLLATE pg_catalog."default",
-            origemassinatura text COLLATE pg_catalog."default",
-            datacadastro text COLLATE pg_catalog."default",
-            dataatualizacao text COLLATE pg_catalog."default",
-            sincronizado boolean 
-        )""")
-        
-        cur.execute("""CREATE TABLE IF NOT EXISTS public.debitosclienteety
-        (
-            id text COLLATE pg_catalog."default" NOT NULL,
-            empresauuid text COLLATE pg_catalog."default" NOT NULL,
-            codigo_cliente text COLLATE pg_catalog."default",
-            periodo text COLLATE pg_catalog."default",
-            valor text COLLATE pg_catalog."default",
-            situacao text COLLATE pg_catalog."default",
-            atualizadoem bigint,
-            pendentesync boolean DEFAULT true,
-            deletado boolean DEFAULT false
-            )""")
+
         
         conn.commit()
         print("Tabelas criadas com sucesso")
+        
     except Exception as e:
         conn.rollback()
         print(f"Erro ao criar tabelas: {e}")
@@ -269,6 +255,10 @@ def exists(table: str, field: str, value: str) -> bool:
 def startup(): 
     create_tables()
     
+    
+# -------------------------------------------------------------------------------------
+# CLIENTES
+# =====================================================================================
 @app.post("/clientes")
 def create_cliente(data: ClienteIn):
     if exists("clientes", "id", data.id):
@@ -365,7 +355,11 @@ def delete_cliente(id: str):
         return {"status": "ok"}
     finally:
         put_conn(conn)
+# =====================================================================================
 
+# -------------------------------------------------------------------------------------
+# VENDAS
+# =====================================================================================
 @app.post("/vendas")
 def create_venda(data: VendaIn):
     if exists("venda", "id", data.id):
@@ -375,10 +369,10 @@ def create_venda(data: VendaIn):
     try:
         cur = conn.cursor()
         cur.execute("""
-            INSERT INTO venda (id, forma_pagamento, valor, data)
-            VALUES (%s,%s,%s,%s)
+            INSERT INTO venda (id, empresauuid, forma_pagamento, valor, data, sincronizado, datacadastro, atualizadoem, deletado)
+            VALUES (%s,%s,%s,%s, %s, %s, %s, %s)
         """, (
-            data.id, data.formaPagamento, data.valor, data.data
+            data.id,data.empresaUuid, data.formaPagamento, data.valor, data.data, data.sincronizado, data.dataCadastro, data.atualizadoEm, data.deletado
         ))
         conn.commit()
         return {"status": "ok"}
@@ -386,25 +380,25 @@ def create_venda(data: VendaIn):
         put_conn(conn)
 
 @app.get("/vendas")
-def list_vendas():
-    id: str
-    formaPagamento: str
-    valor: float
-    data: str
-    
+def list_vendas():    
     conn = get_conn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT * FROM venda")
+        cur.execute("SELECT id, empresauuid, formapagamento, valor, data, sincronizado, datacadastro, atualizadoem, deletado FROM venda")
         
         result = cur.fetchall()
-        vendas =[]
+        vendas = []
         for row in result:
             vendas.append(VendaIn(id= row[0], 
-                                  formaPagamento=row[1],
-                                  valor=row[2],
-                                  data=row[3]))
-        
+                                  empresaUuid= row[1],
+                                  formaPagamento=row[2],
+                                  valor=row[3],
+                                  data=row[4],
+                                  sincronizado=row[5],
+                                  dataCadastro=row[6],
+                                  atualizadoEm=row[7],
+                                  deletado=row[8]
+                                  ))
         
         return vendas
     finally:
@@ -431,8 +425,11 @@ def delete_venda(id: str):
         return {"status": "ok"}
     finally:
         put_conn(conn)
+# =====================================================================================
 
-
+# -------------------------------------------------------------------------------------
+# ITENS VENDA
+# =====================================================================================
 @app.post("/itensVenda")
 def create_item_venda(data: ItemVendaIn):
     if not exists("venda", "id", data.vendaId):
@@ -457,7 +454,7 @@ def create_item_venda(data: ItemVendaIn):
     finally:
         put_conn(conn)
 
-@app.get("/itens-venda")
+@app.get("/itensVenda")
 def list_itens_venda(vendaId: str):
     if not exists("venda", "id", vendaId):
         raise HTTPException(404, "Venda não encontrada")
@@ -483,10 +480,10 @@ def list_itens_venda(vendaId: str):
     finally:
         put_conn(conn)
         
-        
-@app.delete("/itens-venda/{id}")
+@app.delete("/itensVenda/{id}")
 def delete_item_venda(id: str):
     return delete_by_id("itenvendas", id)
+# =====================================================================================
 
 
 def delete_by_id(table: str, id_value: str):
@@ -508,7 +505,9 @@ def delete_by_id(table: str, id_value: str):
         return {"status": "ok", "table": table, "id": id_value}
     finally:
         put_conn(conn)
-
+# -------------------------------------------------------------------------------------
+# SERVIÇOS
+# =====================================================================================
 @app.post("/servicos")
 def create_servico(data: ServicoIn):
     if exists("servico", "id", data.id):
@@ -603,6 +602,57 @@ def update_servico(data: ServicoIn):
     finally:
         put_conn(conn)
 
+@app.get("/servicos/{id}", response_model=ServicoIn)
+def get_servico(id: str):
+    
+    conn = get_conn()
+    
+    try:
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT id,
+                   empresauuid,
+                   nome,
+                   preco,
+                   preco_anterior,
+                   data_criacao,
+                   tipo,
+                   pendentesync,
+                   atualizadoem,
+                   deletado
+            FROM public.servico
+            WHERE id = %s
+        """, (id,))
+
+        row = cur.fetchone()
+
+        if not row:
+            raise HTTPException(404, "Serviço não encontrado")
+
+        servico = {
+            "id": row[0],
+            "empresaUuid": row[1],
+            "nome": row[2],
+            "preco": float(row[3]),
+            "precoAnterior": float(row[4]) if row[4] else 0,
+            "dataCriacao": row[5],
+            "tipo": row[6],
+            "pendenteSync": row[7],
+            "atualizadoEm": row[8],
+            "deletado": row[9]
+        }
+
+        return servico
+
+    finally:
+        put_conn(conn)
+
+# =====================================================================================
+
+# -------------------------------------------------------------------------------------
+# PERFIL
+# =====================================================================================
 @app.post("/perfil")
 def create_perfil(data: PerfilIn):
     if exists("perfil", "id", data.id):
@@ -635,7 +685,11 @@ def list_perfil():
 @app.delete("/perfil/{id}")
 def delete_perfil(id: str):
     return delete_by_id("perfil", id)
+# =====================================================================================
 
+# -------------------------------------------------------------------------------------
+# PDF VENDA
+# =====================================================================================
 @app.post("/pdf-venda")
 def create_pdf_venda(data: PdfVendaIn):
     if exists("pdfvenda", "id", data.id):
@@ -678,12 +732,14 @@ def list_pdf_venda():
     finally:
         put_conn(conn)
 
-
 @app.delete("/pdf-venda/{id}")
 def delete_pdf_venda(id: str):
     return delete_by_id("pdfvenda", id)
+# =====================================================================================
 
-
+# -------------------------------------------------------------------------------------
+# PAGAMENTOS
+# =====================================================================================
 @app.post("/pagamentos")
 def create_pagamento(data: PagamentoIn):
     if exists("pagamentos", "id", data.id):
@@ -760,7 +816,6 @@ def update_pagamento(data: PagamentoIn):
     finally:
         put_conn(conn)
 
-
 @app.get("/pagamentos")
 def list_pagamentos():
     conn = get_conn()
@@ -784,11 +839,14 @@ def list_pagamentos():
     finally:
         put_conn(conn)
 
-
 @app.delete("/pagamentos/{id}")
 def delete_pagamento(id: str):
     return delete_by_id("pagamentos", id)
+# =====================================================================================
 
+# -------------------------------------------------------------------------------------
+# DEBITOS CLIENTE
+# =====================================================================================
 @app.post("/debitos-cliente")
 def create_debito_cliente(data: DebitoClienteIn):
     if exists("debitosclienteEty", "id", data.id):
@@ -877,50 +935,106 @@ def update_debito_cliente(data: DebitoClienteIn):
         return {"status": "atualizado"}
 
     finally:
-        put_conn(conn)
+        put_conn(conn) 
+# =====================================================================================
 
-# Criar empresa
-@app.post("/empresa")
-def criar_empresa(empresa:Empresa):
-    if exists("empresa", "uuid", empresa.uuid):
-        raise HTTPException(409, "Empresa já cadastrada")
+
+# -------------------------------------------------------------------------------------
+# EMPRESA
+# =====================================================================================
+# @app.post("/empresa")
+# def criar_empresa(empresa:Empresa):
+#     if exists("empresa", "uuid", empresa.uuid):
+#         raise HTTPException(409, "Empresa já cadastrada")
     
 
+#     conn = get_conn()
+#     try:
+#         cur = conn.cursor()
+#         cur.execute("""
+#         INSERT INTO empresa (
+#             uuid, cnpj, razaoSocial, nomefantasia, municipio,
+#             uf, cnae, ativo, bloqueado, motivobloqueio, plano,
+#             statusassinatura, datainicioassinatura, datafimassinatura,
+#             origemassinatura, datacadastro, dataatualizacao
+#         ) VALUES (
+#             %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s, %s,%s,%s
+#         )
+#     """,     (empresa.uuid,
+#     empresa.cnpj,
+#     empresa.razaoSocial,
+#     empresa.nomeFantasia,
+#     empresa.municipio,
+#     empresa.uf,
+#     empresa.cnae,
+#     empresa.ativo,
+#     empresa.bloqueado,
+#     empresa.motivoBloqueio,
+#     empresa.plano,
+#     empresa.statusAssinatura,
+#     empresa.dataInicioAssinatura,
+#     empresa.dataFimAssinatura,
+#     empresa.origemAssinatura,
+#     empresa.dataCadastro,
+#     empresa.dataAtualizacao))
+#         conn.commit()
+#         return {"msg": "Empresa cadastrada com sucesso"}
+#     finally:
+#         put_conn(conn)
+        
+        
+@app.post("/empresa")
+def criar_empresa(data: Empresa):
+    """cadastrar empresa na base de dados"""
+
+    if exists("empresa", "id", data.id) or exists("empresa", "cnpj", data.cnpj):
+        raise HTTPException(409, "Empresa já existe")
+
     conn = get_conn()
+
     try:
         cur = conn.cursor()
+
         cur.execute("""
-        INSERT INTO empresa (
-            uuid, cnpj, razaoSocial, nomefantasia, municipio,
-            uf, cnae, ativo, bloqueado, motivobloqueio, plano,
-            statusassinatura, datainicioassinatura, datafimassinatura,
-            origemassinatura, datacadastro, dataatualizacao
-        ) VALUES (
-            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s, %s,%s,%s
-        )
-    """,     (empresa.uuid,
-    empresa.cnpj,
-    empresa.razaoSocial,
-    empresa.nomeFantasia,
-    empresa.municipio,
-    empresa.uf,
-    empresa.cnae,
-    empresa.ativo,
-    empresa.bloqueado,
-    empresa.motivoBloqueio,
-    empresa.plano,
-    empresa.statusAssinatura,
-    empresa.dataInicioAssinatura,
-    empresa.dataFimAssinatura,
-    empresa.origemAssinatura,
-    empresa.dataCadastro,
-    empresa.dataAtualizacao))
+            INSERT INTO empresa (
+                id, uuid, cnpj, razaoSocial, nomeFantasia,
+                municipio, uf, cnae, ativo, bloqueado,
+                motivoBloqueio, plano, statusAssinatura,
+                dataInicioAssinatura, dataFimAssinatura,
+                origemAssinatura, dataCadastro, dataAtualizacao,
+                sincronizado
+            )
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                    %s,%s,%s,%s,%s,%s,%s,%s,%s)
+        """, (
+            data.id,
+            data.uuid,
+            data.cnpj,
+            data.razaoSocial,
+            data.nomeFantasia,
+            data.municipio,
+            data.uf,
+            data.cnae,
+            data.ativo,
+            data.bloqueado,
+            data.motivoBloqueio,
+            data.plano,
+            data.statusAssinatura,
+            data.dataInicioAssinatura,
+            data.dataFimAssinatura,
+            data.origemAssinatura,
+            data.dataCadastro,
+            data.dataAtualizacao,
+            data.sincronizado
+        ))
+
         conn.commit()
-        return {"msg": "Empresa cadastrada com sucesso"}
+
+        return {"status": "ok", "mensagem": "Empresa criada"}
+
     finally:
         put_conn(conn)
-        
-        
+
 @app.get("/empresa")
 def get_empresa():
     TOKEN_API = os.getenv('key_first_acess')
@@ -941,16 +1055,38 @@ def get_empresa():
         return empresas
     finally:
         put_conn(conn)
-        
-        
-# Validação de email
+
+@app.delete("/empresa/{id}")
+def deletar_empresa(id: str):
+
+    if not exists("empresa", "id", id):
+        raise HTTPException(404, "Empresa não encontrada")
+
+    conn = get_conn()
+
+    try:
+        cur = conn.cursor()
+
+        cur.execute("""
+            DELETE FROM empresa
+            WHERE id = %s
+        """, (id,))
+
+        conn.commit()
+
+        return {"status": "ok", "mensagem": "Empresa deletada"}
+
+    finally:
+        put_conn(conn)
+
+# =====================================================================================
+
+# -------------------------------------------------------------------------------------
+# EMAIL
+# =====================================================================================   
 def validar_email(email:str):
     regex = r'^[\w\.-]+@[\w\.-]+\.\w+$'
     return re.match(regex, email)
-    
-
-# from random import randrange
-# from fastapi import HTTPException
 
 @app.post("/email")
 def receber_email(email: receiverEmail):
@@ -1047,8 +1183,57 @@ def receber_email(email: receiverEmail):
             return {"sucesso": False, "mensagem": "Falha ao enviar email"}
 
     finally:
-        put_conn(conn)    
+        put_conn(conn)   
+          
+@app.post("/validaEmail")
+def validaEmail(data: ValidarEmailIn):
+    conn = get_conn()
+
+    try:
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT valida
+            FROM validationEmail
+            WHERE email = %s AND codigo = %s
+        """, (data.email, data.codigo))
+
+        row = cur.fetchone()
+
+        if not row:
+            return {
+                "sucesso": False,
+                "mensagem": "Código ou email inválido"
+            }
+
+        if not row[0]:
+            return {
+                "sucesso": False,
+                "mensagem": "Código já utilizado"
+            }
+
+        # marcar como usado
+        cur.execute("""
+            UPDATE validationEmail
+            SET valida = FALSE
+            WHERE email = %s AND codigo = %s
+        """, (data.email, data.codigo))
+
+        conn.commit()
+
+        return {
+            "sucesso": True,
+            "mensagem": "Email validado com sucesso"
+        }
+
+    finally:
+        put_conn(conn)
+# =====================================================================================
     
+
+# -------------------------------------------------------------------------------------
+# USUÁRIOS
+# =====================================================================================
 @app.post("/usuarios")
 def create_usuario(data: Usuario):
 
@@ -1177,11 +1362,12 @@ def delete_usuario(uuid: str):
 
     finally:
         put_conn(conn)
-        
-        
-        
+ # =====================================================================================
 
 
+# -------------------------------------------------------------------------------------
+# LOGIN
+# =====================================================================================
 @app.post("/login", response_model=loginResponse)
 def login(data: loginIn):
 
@@ -1273,125 +1459,6 @@ def login(data: loginIn):
             usuario=usuario_obj,
             empresa=empresa_obj
         )
-
-    finally:
-        put_conn(conn)
-        
-@app.post("/validaEmail")
-def validaEmail(data: ValidarEmailIn):
-    conn = get_conn()
-
-    try:
-        cur = conn.cursor()
-
-        cur.execute("""
-            SELECT valida
-            FROM validationEmail
-            WHERE email = %s AND codigo = %s
-        """, (data.email, data.codigo))
-
-        row = cur.fetchone()
-
-        if not row:
-            return {
-                "sucesso": False,
-                "mensagem": "Código ou email inválido"
-            }
-
-        if not row[0]:
-            return {
-                "sucesso": False,
-                "mensagem": "Código já utilizado"
-            }
-
-        # marcar como usado
-        cur.execute("""
-            UPDATE validationEmail
-            SET valida = FALSE
-            WHERE email = %s AND codigo = %s
-        """, (data.email, data.codigo))
-
-        conn.commit()
-
-        return {
-            "sucesso": True,
-            "mensagem": "Email validado com sucesso"
-        }
-
-    finally:
-        put_conn(conn)
-        
-@app.post("/empresa")
-def criar_empresa(data: Empresa):
-    """cadastrar empresa na base de dados"""
-
-    if exists("empresa", "id", data.id) or exists("empresa", "cnpj", data.cnpj):
-        raise HTTPException(409, "Empresa já existe")
-
-    conn = get_conn()
-
-    try:
-        cur = conn.cursor()
-
-        cur.execute("""
-            INSERT INTO empresa (
-                id, uuid, cnpj, razaoSocial, nomeFantasia,
-                municipio, uf, cnae, ativo, bloqueado,
-                motivoBloqueio, plano, statusAssinatura,
-                dataInicioAssinatura, dataFimAssinatura,
-                origemAssinatura, dataCadastro, dataAtualizacao,
-                sincronizado
-            )
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-                    %s,%s,%s,%s,%s,%s,%s,%s,%s)
-        """, (
-            data.id,
-            data.uuid,
-            data.cnpj,
-            data.razaoSocial,
-            data.nomeFantasia,
-            data.municipio,
-            data.uf,
-            data.cnae,
-            data.ativo,
-            data.bloqueado,
-            data.motivoBloqueio,
-            data.plano,
-            data.statusAssinatura,
-            data.dataInicioAssinatura,
-            data.dataFimAssinatura,
-            data.origemAssinatura,
-            data.dataCadastro,
-            data.dataAtualizacao,
-            data.sincronizado
-        ))
-
-        conn.commit()
-
-        return {"status": "ok", "mensagem": "Empresa criada"}
-
-    finally:
-        put_conn(conn)
-        
-@app.delete("/empresa/{id}")
-def deletar_empresa(id: str):
-
-    if not exists("empresa", "id", id):
-        raise HTTPException(404, "Empresa não encontrada")
-
-    conn = get_conn()
-
-    try:
-        cur = conn.cursor()
-
-        cur.execute("""
-            DELETE FROM empresa
-            WHERE id = %s
-        """, (id,))
-
-        conn.commit()
-
-        return {"status": "ok", "mensagem": "Empresa deletada"}
 
     finally:
         put_conn(conn)
@@ -1513,48 +1580,3 @@ def redefinir_senha(valida: ValidarSenha):
         put_conn(conn)
     
     
-@app.get("/servico/{id}", response_model=ServicoIn)
-def get_servico(id: str):
-    
-    conn = get_conn()
-    
-    try:
-        cur = conn.cursor()
-
-        cur.execute("""
-            SELECT id,
-                   empresauuid,
-                   nome,
-                   preco,
-                   preco_anterior,
-                   data_criacao,
-                   tipo,
-                   pendentesync,
-                   atualizadoem,
-                   deletado
-            FROM public.servico
-            WHERE id = %s
-        """, (id,))
-
-        row = cur.fetchone()
-
-        if not row:
-            raise HTTPException(404, "Serviço não encontrado")
-
-        servico = {
-            "id": row[0],
-            "empresaUuid": row[1],
-            "nome": row[2],
-            "preco": float(row[3]),
-            "precoAnterior": float(row[4]) if row[4] else 0,
-            "dataCriacao": row[5],
-            "tipo": row[6],
-            "pendenteSync": row[7],
-            "atualizadoEm": row[8],
-            "deletado": row[9]
-        }
-
-        return servico
-
-    finally:
-        put_conn(conn)
