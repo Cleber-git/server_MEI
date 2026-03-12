@@ -800,7 +800,7 @@ def create_debito_cliente(data: DebitoClienteIn):
         cur.execute("""
             INSERT INTO debitosclienteEty
             (id,empresauuid, codigo_cliente, periodo, valor, situacao, atualizadoem, pendentesync, deletado)
-            VALUES (%s,%s,%s,%s,%s, %s, %s, %s)
+            VALUES (%s,%s,%s,%s,%s, %s, %s, %s, %s)
         """, (
             data.id, data.empresaUuid, data.codigoCliente,
             data.periodo, data.valor, data.situacao, data.atualizadoEm, data.pendenteSync, data.deletado
