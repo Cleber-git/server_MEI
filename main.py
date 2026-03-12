@@ -799,10 +799,10 @@ def create_debito_cliente(data: DebitoClienteIn):
         cur = conn.cursor()
         cur.execute("""
             INSERT INTO debitosclienteEty
-            (id, codigo_cliente, periodo, valor, situacao, atualizadoem, pendentesync, deletado)
+            (id,empresauuid, codigo_cliente, periodo, valor, situacao, atualizadoem, pendentesync, deletado)
             VALUES (%s,%s,%s,%s,%s, %s, %s, %s)
         """, (
-            data.id, data.codigoCliente,
+            data.id, data.empresaUuid, data.codigoCliente,
             data.periodo, data.valor, data.situacao, data.atualizadoEm, data.pendenteSync, data.deletado
         ))
         conn.commit()
