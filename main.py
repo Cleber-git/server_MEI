@@ -1146,7 +1146,7 @@ def get_empresa():
 @app.delete("/empresa/{id}")
 def deletar_empresa(id: str):
 
-    if not exists("empresa", "id", id):
+    if not exists("empresa", "uuid", id):
         raise HTTPException(404, "Empresa não encontrada")
 
     conn = get_conn()
@@ -1154,14 +1154,25 @@ def deletar_empresa(id: str):
     try:
         cur = conn.cursor()
 
+        # Deleta usuários da empresa
+        cur.execute("""
+            DELETE FROM usuario
+            WHERE empresauuid = %s
+        """, (id,))
+
+        # Deleta a empresa
         cur.execute("""
             DELETE FROM empresa
-            WHERE id = %s
+            WHERE uuid = %s
         """, (id,))
 
         conn.commit()
 
-        return {"status": "ok", "mensagem": "Empresa deletada"}
+        return {"status": "ok", "mensagem": "Empresa e usuários deletados"}
+
+    except Exception as e:
+        conn.rollback()
+        raise e
 
     finally:
         put_conn(conn)
