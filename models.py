@@ -30,7 +30,7 @@ class ItemVendaIn(BaseModel):
     vendaId: str
     tipo: str
     nome: str
-    valor: str
+    valor: float
     quantidade: str
 
 
