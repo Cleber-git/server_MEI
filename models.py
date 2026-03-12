@@ -3,13 +3,13 @@ from typing import Optional
 
 
 class ClienteIn(BaseModel):
-    id: str
+    uuid: str
     empresaUuid: str
     nome: str
     telefone: Optional[str] = None
     email: Optional[str] = None
     endereco: Optional[str] = None
-    totalDebitos: float = 0.0
+    totalDebitos: str
     atualizadoEm : int
     pendenteSync : bool
     deletado: bool

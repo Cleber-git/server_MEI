@@ -161,7 +161,10 @@ def create_tables():
             telefone TEXT,
             email TEXT,
             endereco TEXT,
-            totaldebitos TEXT
+            totaldebitos TEXT,
+            atualizadoEm BIGINT,
+            pendenteSync boolean,
+            deletado boolean
             )""")
         
         cur.execute("""CREATE TABLE IF NOT EXISTS Empresa(
@@ -254,7 +257,7 @@ def startup():
     
 @app.post("/clientes")
 def create_cliente(data: ClienteIn):
-    if exists("clientes", "id", data.id):
+    if exists("clientes", "id", data.uuid):
         raise HTTPException(409, "Cliente já existe")
 
     conn = get_conn()
@@ -264,7 +267,7 @@ def create_cliente(data: ClienteIn):
             INSERT INTO clientes (id, nome, telefone, email, endereco, totaldebitos, atualizadooem, pendentesync, deletado)
             VALUES (%s,%s,%s,%s,%s,%s)
         """, (
-            data.id, data.nome, data.telefone,
+            data.uuid, data.nome, data.telefone,
             data.email, data.endereco, data.totalDebitos, data.atualizadoEm, data.pendenteSync, data.deletado
         ))
         conn.commit()
@@ -284,7 +287,7 @@ def list_clientes():
         
         for r in row:
             clientes.append(ClienteIn(
-                id= r[0], 
+                uuid= r[0], 
                 nome=r[1], 
                 telefone=r[2], 
                 email=r[3], 
@@ -479,6 +482,7 @@ def create_servico(data: ServicoIn):
             data.id, data.nome, data.preco,
             data.precoAnterior, data.dataCriacao, data.tipo, data.empresaUuid, data.pendenteSync, data.atualizadoEm, data.deletado
         ))
+        
         conn.commit()
         return {"status": "ok"}
     finally:
