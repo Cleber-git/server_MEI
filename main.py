@@ -27,7 +27,7 @@ from fastapi.responses import JSONResponse
 # ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 app = FastAPI()
-
+empresa_atual = ""
 
 @app.middleware("http")
 async def validar_empresa(request: Request, call_next):
@@ -83,6 +83,7 @@ async def validar_empresa(request: Request, call_next):
             )
 
         request.state.empresa_uuid = empresa_uuid
+        empresa_atual = empresa_uuid
 
     finally:
         put_conn(conn)
@@ -1415,8 +1416,8 @@ def get_usuarios():
 
         cur.execute("""
             SELECT uuid, email, senhahash, nome, empresauuid, ativo, datacadastro, ultimologin
-            FROM usuario
-        """)
+            FROM usuario where empresauuid = %s
+        """, (empresa_atual))
 
         rows = cur.fetchall()
 
