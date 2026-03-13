@@ -46,10 +46,10 @@ async def validar_empresa(request: Request, call_next):
         "/login"
     ]
 
+    chave = request.headers.get("validation-uuid")
+    chave_env = os.getenv("key_first_acess")
     print(chave, chave_env, "endPoint: ", path)
     if request.method == "POST" and path in rotas_publicas:
-        chave = request.headers.get("validation-uuid")
-        chave_env = os.getenv("key_first_acess")
 
         if chave != chave_env:
             return JSONResponse(
