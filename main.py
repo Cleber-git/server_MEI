@@ -1073,7 +1073,7 @@ def criar_empresa(data: Empresa):
     """cadastrar empresa na base de dados"""
 
     if exists("empresa", "uuid", data.uuid) or exists("empresa", "cnpj", data.cnpj):
-        return {"sucesso": "False", "mensagem": "Empresa já existe no sistema"}
+        return {"sucesso": False, "mensagem": "Empresa já existe no sistema"}
 
 
     conn = get_conn()
@@ -1115,7 +1115,7 @@ def criar_empresa(data: Empresa):
 
         conn.commit()
 
-        return {"sucesso": "True", "mensagem": "Empresa criada"}
+        return {"sucesso": True, "mensagem": "Empresa criada"}
 
     finally:
         put_conn(conn)
