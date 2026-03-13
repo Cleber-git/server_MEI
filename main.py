@@ -1128,7 +1128,7 @@ def get_empresa():
     conn = get_conn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT nomefantasia, cnpj FROM empresa")
+        cur.execute("SELECT nomefantasia, cnpj FROM empresa where ativo = True")
         row = cur.fetchall()
         
         empresas = []
@@ -1161,7 +1161,8 @@ def deletar_empresa(id: str):
 
         # Deleta a empresa
         cur.execute("""
-            DELETE FROM empresa
+            UPDATE empresa
+            SET False
             WHERE uuid = %s
         """, (id,))
 
