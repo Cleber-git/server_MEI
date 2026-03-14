@@ -18,7 +18,6 @@ from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
 from fastapi.responses import JSONResponse
 
-import Header
 
 # SECRET_KEY = "minha_chave_super_secreta_123"
 # ALGORITHM = "HS256"
