@@ -84,6 +84,7 @@ async def validar_empresa(request: Request, call_next):
 
         request.state.empresa_uuid = empresa_uuid
         empresa_atual = empresa_uuid
+        print("empresa atual middleware: ", empresa_atual )
 
     finally:
         put_conn(conn)
@@ -398,6 +399,7 @@ def list_vendas():
     conn = get_conn()
     try:
         cur = conn.cursor()
+        print("empresa atual: ", empresa_atual)
         cur.execute("SELECT id, empresauuid, forma_pagamento, valor, data, sincronizado, datacadastro, atualizadoem, deletado FROM venda where empresauuid = %s", (empresa_atual,))
         
         result = cur.fetchall()
