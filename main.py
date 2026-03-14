@@ -322,7 +322,7 @@ def list_clientes():
         atualizadoem,
         pendentesync,
         deletado
-        FROM clientes where empresauuid = %1
+        FROM clientes where empresauuid = %s
         """, (empresa_atual,))
 
         rows = cur.fetchall()
@@ -398,7 +398,7 @@ def list_vendas():
     conn = get_conn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT id, empresauuid, forma_pagamento, valor, data, sincronizado, datacadastro, atualizadoem, deletado FROM venda where empresauuid = %1", (empresa_atual,))
+        cur.execute("SELECT id, empresauuid, forma_pagamento, valor, data, sincronizado, datacadastro, atualizadoem, deletado FROM venda where empresauuid = %s", (empresa_atual,))
         
         result = cur.fetchall()
         vendas = []
@@ -551,7 +551,7 @@ def list_itens_venda():
     try:
         cur = conn.cursor()
         cur.execute(
-            "SELECT * FROM itenvendas where empresauuid = %1", (empresa_atual,) 
+            "SELECT * FROM itenvendas where empresauuid = %s", (empresa_atual,) 
         )
         rows = cur.fetchall()
         
@@ -623,7 +623,7 @@ def list_servicos():
     conn = get_conn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT id, nome, preco, preco_anterior, data_criacao, tipo, empresauuid, pendenteSync, atualizadoEm, deletado FROM servico where empresauuid = %1", (empresa_atual,))
+        cur.execute("SELECT id, nome, preco, preco_anterior, data_criacao, tipo, empresauuid, pendenteSync, atualizadoEm, deletado FROM servico where empresauuid = %s", (empresa_atual,))
         rows = cur.fetchall()
 
         return [
@@ -710,7 +710,7 @@ def get_servico(id: str):
                    atualizadoem,
                    deletado
             FROM public.servico
-            WHERE id = %s and empresauuid = %1
+            WHERE id = %s and empresauuid = %s
         """, (id, empresa_atual))
         
 
@@ -909,7 +909,7 @@ def list_pagamentos():
     conn = get_conn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT * FROM pagamentos where empresauuid = %1", (empresa_atual,))
+        cur.execute("SELECT * FROM pagamentos where empresauuid = %s", (empresa_atual,))
         rows = cur.fetchall()
 
         return [
@@ -961,7 +961,7 @@ def list_debitos_cliente():
     conn = get_conn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT * FROM debitosclienteEty where empresauuid = %1", (empresa_atual,))
+        cur.execute("SELECT * FROM debitosclienteEty where empresauuid = %s", (empresa_atual,))
         rows = cur.fetchall()
 
         return [
@@ -1130,7 +1130,7 @@ def get_empresa():
     conn = get_conn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT nomefantasia, cnpj FROM empresa where ativo = True where uuid = %1", (empresa_atual,))
+        cur.execute("SELECT nomefantasia, cnpj FROM empresa where ativo = True where uuid = %s", (empresa_atual,))
         row = cur.fetchall()
         
         empresas = []
