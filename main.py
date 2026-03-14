@@ -1,9 +1,7 @@
-from fastapi import FastAPI, Request
-from fastapi import HTTPException
+from fastapi import FastAPI, Request, HTTPException, Query, Header, Depends
 import os
 import asyncio
 from typing import List
-from fastapi import Query
 from db import *
 from models import *
 from jose import JWTError, jwt
@@ -20,14 +18,16 @@ from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
 from fastapi.responses import JSONResponse
 
-
+import Header
 
 # SECRET_KEY = "minha_chave_super_secreta_123"
 # ALGORITHM = "HS256"
 # ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 app = FastAPI()
-empresa_atual = ""
+
+def get_empresa(validation_uuid: str = Header(alias="validation-uuid")):
+    return validation_uuid
 
 @app.middleware("http")
 async def validar_empresa(request: Request, call_next):
@@ -83,8 +83,6 @@ async def validar_empresa(request: Request, call_next):
             )
 
         request.state.empresa_uuid = empresa_uuid
-        empresa_atual = empresa_uuid
-        print("empresa atual middleware: ", empresa_atual )
 
     finally:
         put_conn(conn)
@@ -306,7 +304,7 @@ def create_cliente(data: ClienteIn):
         put_conn(conn)
 
 @app.get("/clientes")
-def list_clientes():
+def list_clientes(empresa_atual: str = Depends(get_empresa)):
     conn = get_conn()
     try:
         cur = conn.cursor()
@@ -395,7 +393,7 @@ def create_venda(data: VendaIn):
         put_conn(conn)
 
 @app.get("/vendas")
-def list_vendas():    
+def list_vendas(empresa_atual: str = Depends(get_empresa)):    
     conn = get_conn()
     try:
         cur = conn.cursor()
@@ -545,7 +543,7 @@ def create_item_venda(data: ItemVendaIn):
         put_conn(conn)
 
 @app.get("/vendas/itens")
-def list_itens_venda():
+def list_itens_venda(empresa_atual: str = Depends(get_empresa)):
     # if not exists():
     #     raise HTTPException(404, "Venda não encontrada")
 
@@ -630,7 +628,7 @@ def create_servico(data: ServicoIn):
         put_conn(conn)
 
 @app.get("/servicos")
-def list_servicos():
+def list_servicos(empresa_atual: str = Depends(get_empresa)):
     conn = get_conn()
     try:
         cur = conn.cursor()
@@ -702,7 +700,7 @@ def update_servico(data: ServicoIn):
         put_conn(conn)
 
 @app.get("/servicos/{id}", response_model=ServicoIn)
-def get_servico(id: str):
+def get_servico(id: str, empresa_atual: str = Depends(get_empresa)):
     
     conn = get_conn()
     
@@ -770,7 +768,7 @@ def create_perfil(data: PerfilIn):
         put_conn(conn)
 
 @app.get("/perfil")
-def list_perfil():
+def list_perfil(empresa_atual: str = Depends(get_empresa)):
     conn = get_conn()
     try:
         cur = conn.cursor()
@@ -811,7 +809,7 @@ def create_pdf_venda(data: PdfVendaIn):
         put_conn(conn)
 
 @app.get("/pdfVenda")
-def list_pdf_venda():
+def list_pdf_venda(empresa_atual: str = Depends(get_empresa)):
     conn = get_conn()
     try:
         cur = conn.cursor()
@@ -916,7 +914,7 @@ def update_pagamento(data: PagamentoIn):
         put_conn(conn)
 
 @app.get("/pagamentos")
-def list_pagamentos():
+def list_pagamentos(empresa_atual: str = Depends(get_empresa)):
     conn = get_conn()
     try:
         cur = conn.cursor()
@@ -968,7 +966,7 @@ def create_debito_cliente(data: DebitoClienteIn):
         put_conn(conn)
 
 @app.get("/debitos-cliente")
-def list_debitos_cliente():
+def list_debitos_cliente(empresa_atual: str = Depends(get_empresa)):
     conn = get_conn()
     try:
         cur = conn.cursor()
@@ -1135,7 +1133,7 @@ def criar_empresa(data: Empresa):
         put_conn(conn)
 
 @app.get("/empresa")
-def get_empresa():
+def get_empresa(empresa_atual: str = Depends(get_empresa)):
     TOKEN_API = os.getenv('key_first_acess')
      
     conn = get_conn()
@@ -1420,7 +1418,7 @@ def update_usuario(data: Usuario):
         put_conn(conn)
         
 @app.get("/usuarios")
-def get_usuarios():
+def get_usuarios(empresa_atual: str = Depends(get_empresa)):
 
     conn = get_conn()
     try:
