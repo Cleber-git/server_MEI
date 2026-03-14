@@ -356,8 +356,8 @@ def delete_cliente(id: str):
             raise HTTPException(404, "Cliente não encontrado")
 
         cur.execute(
-            "SELECT 1 FROM debitosclienteEty WHERE codigo_cliente = %s LIMIT 1",
-            (id,)
+        "SELECT 1 FROM debitosclienteEty WHERE codigo_cliente = %s AND situacao = 'PENDENTE' LIMIT 1",
+        (id,)
         )
         if cur.fetchone():
             raise HTTPException(409, "Cliente possui débitos vinculados")
