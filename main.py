@@ -550,9 +550,18 @@ def list_itens_venda():
     conn = get_conn()
     try:
         cur = conn.cursor()
-        cur.execute(
-            "SELECT * FROM itenvendas where empresauuid = %s", (empresa_atual,) 
-        )
+                 
+        cur.execute("""
+        SELECT iv.id,
+           iv.venda_id,
+           iv.tipo,
+           iv.nome,
+           iv.valor,
+           iv.quantidade
+        FROM itenvendas iv
+        JOIN venda v ON iv.venda_id = v.id
+        WHERE v.empresauuid = %s
+        """, (empresa_atual,))
         rows = cur.fetchall()
         
         itemVenda=[]
