@@ -1172,7 +1172,7 @@ def deletar_empresa(id: str):
         # Deleta a empresa
         cur.execute("""
             UPDATE empresa
-            SET False
+            SET ativo ='False'
             WHERE uuid = %s
         """, (id,))
 
