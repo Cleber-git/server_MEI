@@ -1084,7 +1084,9 @@ def criar_empresa(data: Empresa):
     """cadastrar empresa na base de dados"""
 
     if exists("empresa", "uuid", data.uuid) or exists("empresa", "cnpj", data.cnpj):
+        print("Empresa já existe: ", data.cnpj)
         return {"sucesso": False, "mensagem": "Empresa já existe no sistema"}
+
 
 
     conn = get_conn()
