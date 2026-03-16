@@ -1488,7 +1488,7 @@ def login(data: loginIn):
         cur.execute("""
             SELECT uuid, email, senhahash, nome, empresauuid, ativo, datacadastro, ultimologin
             FROM usuarioMei
-            WHERE email = %s
+            WHERE email = %s AND ativo = True
         """, (data.login,))
 
         user = cur.fetchone()
