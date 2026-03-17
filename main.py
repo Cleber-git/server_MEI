@@ -1201,8 +1201,10 @@ def validar_email(email:str):
 def receber_email(email: receiverEmail):
     """Receber o email para validar se a formatação é válida e enviar código"""
 
-    if exists("empresa", "cnpj", email.cnpj) or exists("usuariomei", "email", email.email):
+    if exists("empresa", "cnpj", email.cnpj) :
         return {"sucesso": False, "mensagem": "Cnpj já foi cadastrado anteriormente"}
+    elif exists("usuariomei", "email", email.email):
+        return {"sucesso": False, "mensagem": "Email já foi cadastrado anteriormente"}
 # Adicionar timeOut para tirar código da fila de validade
     if not validar_email(email.email):
 
