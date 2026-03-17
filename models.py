@@ -108,6 +108,7 @@ class getEmpresa(BaseModel):
     
 class receiverEmail(BaseModel):
     email: str
+    cnpj: str
     
 class responseEmail(BaseModel):
     sucesso: bool
