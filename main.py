@@ -1078,6 +1078,7 @@ def update_debito_cliente(data: DebitoClienteIn):
 #     finally:
 #         put_conn(conn)
         
+
         
 @app.post("/empresa")
 def criar_empresa(data: Empresa):
@@ -1154,6 +1155,79 @@ def get_empresa(empresa_atual: str = Depends(get_empresa)):
     finally:
         put_conn(conn)
 
+@app.put("/empresa")
+def atualizar_empresa(data: Empresa):
+    """Atualizar empresa e refletir no usuariomei"""
+
+    if not exists("empresa", "uuid", data.uuid):
+        return {"sucesso": False, "mensagem": "Empresa não encontrada"}
+
+    conn = get_conn()
+
+    try:
+        cur = conn.cursor()
+
+        # 🔥 Atualiza empresa
+        cur.execute("""
+            UPDATE empresa SET
+                cnpj = %s,
+                razaoSocial = %s,
+                nomeFantasia = %s,
+                municipio = %s,
+                uf = %s,
+                cnae = %s,
+                ativo = %s,
+                bloqueado = %s,
+                motivoBloqueio = %s,
+                plano = %s,
+                statusAssinatura = %s,
+                dataInicioAssinatura = %s,
+                dataFimAssinatura = %s,
+                origemAssinatura = %s,
+                dataAtualizacao = %s,
+                sincronizado = %s
+            WHERE uuid = %s
+        """, (
+            data.cnpj,
+            data.razaoSocial,
+            data.nomeFantasia,
+            data.municipio,
+            data.uf,
+            data.cnae,
+            data.ativo,
+            data.bloqueado,
+            data.motivoBloqueio,
+            data.plano,
+            data.statusAssinatura,
+            data.dataInicioAssinatura,
+            data.dataFimAssinatura,
+            data.origemAssinatura,
+            data.dataAtualizacao,
+            data.sincronizado,
+            data.uuid
+        ))
+
+        #  Atualizando usuariomei
+        cur.execute("""
+            UPDATE usuariomei
+            SET nome = %s
+            WHERE empresauuid = %s
+        """, (
+            data.nomeFantasia,  # ou razaoSocial
+            data.uuid
+        ))
+
+        conn.commit()
+
+        return {"sucesso": True, "mensagem": "Empresa atualizada com sucesso"}
+
+    except Exception as e:
+        conn.rollback()
+        return {"sucesso": False, "mensagem": str(e)}
+
+    finally:
+        put_conn(conn)
+
 @app.delete("/empresa/{id}")
 def deletar_empresa(id: str):
 
@@ -1177,6 +1251,13 @@ def deletar_empresa(id: str):
             WHERE uuid = %s
         """, (id,))
 
+        cur.execute("""
+                    delete from servico where empresauuid = %s
+                    """, (id,))
+        
+        cur.execute("""
+            delete from debitosclienteety where empresauuid = %s
+            """, (id,))
         conn.commit()
 
         return {"status": "ok", "mensagem": "Empresa e usuários deletados"}
