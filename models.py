@@ -45,6 +45,8 @@ class ServicoIn(BaseModel):
     pendenteSync: bool
     atualizadoEm: int
     deletado: bool
+    gtin: str
+    estoque: str
 
 class PerfilIn(BaseModel):
     id: str

@@ -129,7 +129,9 @@ def create_tables():
     tipo text COLLATE pg_catalog."default",
     pendentesync boolean,
     atualizadoem bigint,
-    deletado boolean
+    deletado boolean,
+    gtin TEXT,
+    estoque TEXT
 )""")
         
         cur.execute("""CREATE TABLE IF NOT EXISTS perfil(
@@ -614,11 +616,11 @@ def create_servico(data: ServicoIn):
         cur = conn.cursor()
         cur.execute("""
             INSERT INTO servico
-            (id, nome, preco, preco_anterior, data_criacao, tipo, empresaUuid, pendenteSync, atualizadoEm, deletado)
+            (id, nome, preco, preco_anterior, data_criacao, tipo, empresaUuid, pendenteSync, atualizadoEm, deletado, gtin, estoque)
             VALUES (%s,%s,%s,%s,%s,%s, %s, %s, %s, %s)
         """, (
             data.id, data.nome, data.preco,
-            data.precoAnterior, data.dataCriacao, data.tipo, data.empresaUuid, data.pendenteSync, data.atualizadoEm, data.deletado
+            data.precoAnterior, data.dataCriacao, data.tipo, data.empresaUuid, data.pendenteSync, data.atualizadoEm, data.deletado, data.gtin, data.estoque
         ))
         
         conn.commit()
@@ -631,7 +633,7 @@ def list_servicos(empresa_atual: str = Depends(get_empresa)):
     conn = get_conn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT id, nome, preco, preco_anterior, data_criacao, tipo, empresauuid, pendenteSync, atualizadoEm, deletado FROM servico where empresauuid = %s", (empresa_atual,))
+        cur.execute("SELECT id, nome, preco, preco_anterior, data_criacao, tipo, empresauuid, pendenteSync, atualizadoEm, deletado, gtin, estoque FROM servico where empresauuid = %s", (empresa_atual,))
         rows = cur.fetchall()
 
         return [
@@ -645,7 +647,9 @@ def list_servicos(empresa_atual: str = Depends(get_empresa)):
                 empresaUuid= r[6],
                 pendenteSync=r[7],
                 atualizadoEm=r[8],
-                deletado=r[9]
+                deletado=r[9], 
+                gtin=r[10],
+                estoque=r[11]
             ) for r in rows
         ]
     finally:
@@ -676,7 +680,10 @@ def update_servico(data: ServicoIn):
                 empresaUuid = %s,
                 pendenteSync = %s,
                 atualizadoEm = %s,
-                deletado = %s
+                deletado = %s,
+                gtin = %s,
+                estoque = %s
+                
             WHERE id = %s
         """, (
             data.nome,
@@ -688,6 +695,8 @@ def update_servico(data: ServicoIn):
             data.pendenteSync,
             data.atualizadoEm,
             data.deletado,
+            data.gtin,
+            data.estoque,
             data.id
         ))
 
@@ -1167,7 +1176,7 @@ def atualizar_empresa(data: Empresa):
     try:
         cur = conn.cursor()
 
-        # 🔥 Atualiza empresa
+        # Atualizando empresa
         cur.execute("""
             UPDATE empresa SET
                 cnpj = %s,
@@ -1213,7 +1222,7 @@ def atualizar_empresa(data: Empresa):
             SET nome = %s
             WHERE empresauuid = %s
         """, (
-            data.nomeFantasia,  # ou razaoSocial
+            data.nomeFantasia,
             data.uuid
         ))
 
