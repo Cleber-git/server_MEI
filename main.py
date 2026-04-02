@@ -17,6 +17,8 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
 from fastapi.responses import JSONResponse
+import hashlib
+
 
 
 # SECRET_KEY = "minha_chave_super_secreta_123"
@@ -648,8 +650,8 @@ def list_servicos(empresa_atual: str = Depends(get_empresa)):
                 pendenteSync=r[7],
                 atualizadoEm=r[8],
                 deletado=r[9], 
-                gtin=r[10],
-                estoque=r[11]
+                gtin=str(r[10]),
+                estoque=str(r[11])
             ) for r in rows
         ]
     finally:
@@ -1568,7 +1570,6 @@ def delete_usuario(uuid: str):
         put_conn(conn)
  # =====================================================================================
 
-
 # -------------------------------------------------------------------------------------
 # LOGIN
 # =====================================================================================
@@ -1578,6 +1579,15 @@ def login(data: loginIn):
     conn = get_conn()
     try:
         cur = conn.cursor()
+
+        salt = b"caltechHash"
+
+        senha_seguro = hashlib.pbkdf2_hmac(
+            'sha256',
+            data.senha.encode(),
+            salt,
+            100000
+        )
 
         # buscar usuário pelo email
         cur.execute("""
