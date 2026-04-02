@@ -619,7 +619,7 @@ def create_servico(data: ServicoIn):
         cur.execute("""
             INSERT INTO servico
             (id, nome, preco, preco_anterior, data_criacao, tipo, empresaUuid, pendenteSync, atualizadoEm, deletado, gtin, estoque)
-            VALUES (%s,%s,%s,%s,%s,%s, %s, %s, %s, %s)
+            VALUES (%s,%s,%s,%s,%s,%s, %s, %s, %s, %s, %s, %s)
         """, (
             data.id, data.nome, data.preco,
             data.precoAnterior, data.dataCriacao, data.tipo, data.empresaUuid, data.pendenteSync, data.atualizadoEm, data.deletado, data.gtin, data.estoque
