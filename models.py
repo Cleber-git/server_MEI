@@ -149,3 +149,10 @@ class ValidarSenha(BaseModel):
 class VendaCompletaIn(BaseModel):
     venda: VendaIn
     itens: list[ItemVendaIn]
+
+class NotaFiscal(BaseModel):
+    uuid: str
+    id_venda: int
+    tipo: str
+    xml: str
+    status: str
