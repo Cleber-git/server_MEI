@@ -46,7 +46,8 @@ async def validar_empresa(request: Request, call_next):
         "/validaEmail",
         "/redefinirSenha",
         "/codigoSenha",
-        "/login"
+        "/login",
+        "notafiscal"
     ]
 
     chave = request.headers.get("validation-uuid")

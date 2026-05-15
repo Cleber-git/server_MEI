@@ -22,6 +22,8 @@ from cryptography.hazmat.primitives.asymmetric import padding
 
 from signxml.verifier import SignatureConfiguration
 from signxml.algorithms import SignatureMethod, DigestAlgorithm
+import certifi
+
 
 UF_CONFIG = {
     "SP": {
@@ -472,7 +474,7 @@ def enviar_sefaz(xml_envelope: str, url: str, cert_pem: bytes, key_pem: bytes):
             data=xml_envelope.encode("utf-8"),
             headers=headers,
             cert=(cert_path, key_path),
-            verify=True,
+            verify=certifi.where(),
             timeout=60
         )
 
