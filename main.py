@@ -6,18 +6,19 @@ from db import *
 from models import *
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
-# from email_ import email_routes
 from random import randrange
 import re 
 from email_ import email_service
 import requests
 
+import json
 from email.mime.text import MIMEText
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
 from fastapi.responses import JSONResponse
 import hashlib
+import nfe
 
 
 
@@ -26,6 +27,7 @@ import hashlib
 # ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 app = FastAPI()
+
 
 def get_empresa(validation_uuid: str = Header(alias="validation-uuid")):
     return validation_uuid
@@ -472,7 +474,6 @@ def create_venda_completa(data: VendaCompletaIn):
 
         # -------- ITENS --------
         for item in data.itens:
-
             if exists("itenvendas", "id", item.id):
                 raise HTTPException(409, f"Item {item.id} já existe")
 
@@ -1794,3 +1795,102 @@ def redefinir_senha(valida: ValidarSenha):
         put_conn(conn)
     
     
+
+def enviar_nota(xml):
+    print("\n========== XML CRU RECEBIDO DO APP ==========", flush=True)
+    print(xml, flush=True)
+    print("========== FIM XML CRU ==========\n", flush=True)
+
+    response = nfe.emitir_nfce(xml)
+
+    print("\n========== RESPONSE COMPLETO NF-e ==========", flush=True)
+    print(json.dumps(response, indent=2, ensure_ascii=False), flush=True)
+    print("========== FIM RESPONSE NF-e ==========\n", flush=True)
+
+    if isinstance(response, dict):
+        if response.get("xml_assinado"):
+            print("\n========== XML ASSINADO ==========", flush=True)
+            print(response.get("xml_assinado"), flush=True)
+            print("========== FIM XML ASSINADO ==========\n", flush=True)
+
+        if response.get("lote"):
+            print("\n========== LOTE enviNFe ==========", flush=True)
+            print(response.get("lote"), flush=True)
+            print("========== FIM LOTE ==========\n", flush=True)
+
+        if response.get("envelope"):
+            print("\n========== SOAP ENVELOPE ==========", flush=True)
+            print(response.get("envelope"), flush=True)
+            print("========== FIM SOAP ==========\n", flush=True)
+
+    return response
+
+
+@app.post("/notafiscal")
+def criar_nota(nota: NotaFiscal):
+    conn = None
+    cur = None
+
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+
+        # evita duplicidade (IDEMPOTENTE)
+        cur.execute(
+            "SELECT 1 FROM nota_fiscal WHERE uuid = %s",
+            (nota.uuid,)
+        )
+        if cur.fetchone():
+            return {
+                "success": True,
+                "message": "Nota já existe",
+                "uuid": nota.uuid
+            }
+
+
+        # xml_assinada = assinar_xml(nota.xml, os.getenv("PFX_PATH"), os.getenv("PFX_PASSWORD"))
+        # INSERT
+        cur.execute("""
+            INSERT INTO nota_fiscal (
+                uuid,
+                id_venda,
+                tipo,
+                xml,
+                status,
+                criado_em
+            ) VALUES (%s, %s, %s, %s, %s, %s)
+        """, (
+            nota.uuid,
+            nota.id_venda,
+            nota.tipo,
+            nota.xml,
+            nota.status,
+            datetime.now()
+        ))
+
+        conn.commit()
+        response = enviar_nota(nota.xml)
+        
+        # logger.info(f"response: {response}")
+        
+        return {
+            "success": True,
+            "message": "Nota fiscal salva com sucesso",
+            "uuid": nota.uuid
+        }
+
+    except Exception as e:
+        if conn:
+            print("erro aqui: ", e)
+            conn.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+
+    finally:
+        if cur:
+            cur.close()          # FECHA CURSOR
+        if conn:
+            put_conn(conn)       # DEVOLVE PRO POOL
