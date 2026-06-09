@@ -309,6 +309,10 @@ def apenas_digitos(valor: Optional[str]) -> str:
     return re.sub(r"\D", "", valor or "")
 
 
+def apenas_alfanumericos(valor: Optional[str]) -> str:
+    return re.sub(r"[^0-9A-Za-z]", "", valor or "")
+
+
 def cpf_valido(cpf: str) -> bool:
     cpf = apenas_digitos(cpf)
     if len(cpf) != 11 or cpf == cpf[0] * 11:
@@ -338,7 +342,11 @@ def cnpj_valido(cnpj: str) -> bool:
 
 
 def documento_tomador_valido(documento: str) -> bool:
-    documento = apenas_digitos(documento)
+    documento = apenas_alfanumericos(documento)
+    if not documento:
+        return False
+    if not documento.isdigit():
+        return True
     if len(documento) == 11:
         return cpf_valido(documento)
     if len(documento) == 14:
@@ -424,7 +432,7 @@ def validar_payload_nfse(data: NotaServicoIn) -> Optional[str]:
     if not data.tomador.nome.strip():
         return "Informe o nome do tomador."
     if not documento_tomador_valido(data.tomador.documento):
-        return "Documento do tomador invalido. Envie CPF ou CNPJ somente com numeros."
+        return "Documento do tomador invalido. Envie CPF, CNPJ ou documento alfanumerico."
     if data.tomador.email and not validar_email(data.tomador.email):
         return "Email do tomador invalido."
     if not data.servico.descricao.strip():
@@ -452,7 +460,7 @@ def montar_payload_fiscal(data: NotaServicoIn, empresa: dict) -> dict:
         },
         "tomador": {
             "nome": data.tomador.nome.strip(),
-            "documento": apenas_digitos(data.tomador.documento),
+            "documento": apenas_alfanumericos(data.tomador.documento),
             "email": data.tomador.email,
         },
         "servico": {
