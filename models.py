@@ -150,9 +150,32 @@ class VendaCompletaIn(BaseModel):
     venda: VendaIn
     itens: list[ItemVendaIn]
 
-class NotaFiscal(BaseModel):
-    uuid: str
-    id_venda: int
+
+class TomadorNotaServico(BaseModel):
+    nome: str
+    documento: str
+    email: Optional[str] = None
+
+
+class ServicoNotaFiscal(BaseModel):
+    descricao: str
+    valor: float
+    codigoMunicipalServico: str
+
+
+class NotaServicoIn(BaseModel):
+    empresaUuid: str
     tipo: str
-    xml: str
+    tomador: TomadorNotaServico
+    servico: ServicoNotaFiscal
+
+
+class NotaServicoResponse(BaseModel):
+    sucesso: bool
     status: str
+    mensagem: Optional[str] = None
+    numero: Optional[str] = None
+    codigoVerificacao: Optional[str] = None
+    urlPdf: Optional[str] = None
+    urlXml: Optional[str] = None
+    urlConsulta: Optional[str] = None

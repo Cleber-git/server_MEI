@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request, HTTPException, Query, Header, Depends
 import os
 import asyncio
-from typing import List
+from typing import List, Optional
 from db import *
 from models import *
 from jose import JWTError, jwt
@@ -18,7 +18,11 @@ from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
 from fastapi.responses import JSONResponse
 import hashlib
-import nfe
+from psycopg2.extras import Json
+try:
+    import nfe
+except ImportError:
+    nfe = None
 
 
 
@@ -46,8 +50,7 @@ async def validar_empresa(request: Request, call_next):
         "/validaEmail",
         "/redefinirSenha",
         "/codigoSenha",
-        "/login",
-        "/notafiscal"
+        "/login"
     ]
 
     chave = request.headers.get("validation-uuid")
@@ -247,6 +250,37 @@ def create_tables():
     ultimologin bigint
 )""")
 
+        cur.execute("""CREATE TABLE IF NOT EXISTS notas_servico
+(
+    id text COLLATE pg_catalog."default" PRIMARY KEY,
+    empresauuid text COLLATE pg_catalog."default" NOT NULL,
+    payload_enviado jsonb NOT NULL,
+    status text COLLATE pg_catalog."default" NOT NULL,
+    numero text COLLATE pg_catalog."default",
+    codigo_verificacao text COLLATE pg_catalog."default",
+    url_pdf text COLLATE pg_catalog."default",
+    url_xml text COLLATE pg_catalog."default",
+    url_consulta text COLLATE pg_catalog."default",
+    protocolo text COLLATE pg_catalog."default",
+    erro_fiscal text COLLATE pg_catalog."default",
+    ambiente text COLLATE pg_catalog."default",
+    provedor text COLLATE pg_catalog."default",
+    data_criacao bigint NOT NULL,
+    data_atualizacao bigint NOT NULL
+)""")
+
+        cur.execute("""ALTER TABLE empresa
+            ADD COLUMN IF NOT EXISTS regime_tributario text COLLATE pg_catalog."default" DEFAULT 'MEI'
+        """)
+
+        cur.execute("""ALTER TABLE empresa
+            ADD COLUMN IF NOT EXISTS optante_simples boolean DEFAULT true
+        """)
+
+        cur.execute("""ALTER TABLE empresa
+            ADD COLUMN IF NOT EXISTS emissao_nfse_habilitada boolean DEFAULT true
+        """)
+
         
         conn.commit()
         print("Tabelas criadas com sucesso")
@@ -270,9 +304,416 @@ def exists(table: str, field: str, value: str) -> bool:
     finally:
         put_conn(conn)
 
+
+def apenas_digitos(valor: Optional[str]) -> str:
+    return re.sub(r"\D", "", valor or "")
+
+
+def cpf_valido(cpf: str) -> bool:
+    cpf = apenas_digitos(cpf)
+    if len(cpf) != 11 or cpf == cpf[0] * 11:
+        return False
+
+    def digito(corte: int) -> int:
+        soma = sum(int(cpf[i]) * (corte + 1 - i) for i in range(corte - 1))
+        resto = (soma * 10) % 11
+        return 0 if resto == 10 else resto
+
+    return digito(10) == int(cpf[9]) and digito(11) == int(cpf[10])
+
+
+def cnpj_valido(cnpj: str) -> bool:
+    cnpj = apenas_digitos(cnpj)
+    if len(cnpj) != 14 or cnpj == cnpj[0] * 14:
+        return False
+
+    def digito(pesos: list[int], base: str) -> int:
+        soma = sum(int(base[i]) * pesos[i] for i in range(len(pesos)))
+        resto = soma % 11
+        return 0 if resto < 2 else 11 - resto
+
+    primeiro = digito([5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2], cnpj[:12])
+    segundo = digito([6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2], cnpj[:12] + str(primeiro))
+    return primeiro == int(cnpj[12]) and segundo == int(cnpj[13])
+
+
+def documento_tomador_valido(documento: str) -> bool:
+    documento = apenas_digitos(documento)
+    if len(documento) == 11:
+        return cpf_valido(documento)
+    if len(documento) == 14:
+        return cnpj_valido(documento)
+    return False
+
+
+def fiscal_config():
+    ambiente = os.getenv("FISCAL_AMBIENTE", "homologacao").strip().lower()
+    return {
+        "ambiente": ambiente,
+        "provedor": os.getenv("FISCAL_PROVEDOR", "homologacao-local"),
+        "base_url": (os.getenv("FISCAL_API_BASE_URL") or "").rstrip("/"),
+        "token": os.getenv("FISCAL_API_TOKEN"),
+        "emissao_real_habilitada": os.getenv("FISCAL_EMISSAO_REAL_HABILITADA", "false").strip().lower() == "true",
+        "mock_homologacao": os.getenv("FISCAL_MOCK_HOMOLOGACAO", "true").strip().lower() == "true",
+    }
+
+
+def buscar_empresa_fiscal(empresa_uuid: str):
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT uuid, cnpj, razaosocial, nomefantasia, municipio, uf, cnae,
+                   ativo, bloqueado, motivobloqueio, plano, statusassinatura,
+                   regime_tributario, optante_simples, emissao_nfse_habilitada
+            FROM empresa
+            WHERE uuid = %s
+        """, (empresa_uuid,))
+        row = cur.fetchone()
+        if not row:
+            return None
+        return {
+            "uuid": row[0],
+            "cnpj": row[1],
+            "razaoSocial": row[2],
+            "nomeFantasia": row[3],
+            "municipio": row[4],
+            "uf": row[5],
+            "cnae": row[6],
+            "ativo": row[7],
+            "bloqueado": row[8],
+            "motivoBloqueio": row[9],
+            "plano": row[10],
+            "statusAssinatura": row[11],
+            "regimeTributario": row[12],
+            "optanteSimples": row[13],
+            "emissaoNfseHabilitada": row[14],
+        }
+    finally:
+        put_conn(conn)
+
+
+def validar_empresa_para_nfse(empresa: Optional[dict]) -> Optional[str]:
+    if not empresa:
+        return "Empresa nao encontrada."
+    if not empresa["ativo"]:
+        return "Empresa inativa. Ative a empresa antes de emitir nota."
+    if empresa["bloqueado"]:
+        motivo = empresa.get("motivoBloqueio") or "Cadastro bloqueado."
+        return f"Empresa bloqueada para emissao de nota: {motivo}"
+    if not empresa["emissaoNfseHabilitada"]:
+        return "Emissao de NFS-e nao habilitada para esta empresa."
+    if not cnpj_valido(empresa.get("cnpj")):
+        return "CNPJ da empresa invalido ou incompleto."
+    if not empresa.get("municipio") or not empresa.get("uf"):
+        return "Informe municipio e UF da empresa antes de emitir nota."
+    if not empresa.get("cnae"):
+        return "Informe o CNAE da empresa antes de emitir nota."
+
+    regime = (empresa.get("regimeTributario") or "").strip().upper()
+    if regime and regime not in {"MEI", "SIMPLES", "SIMPLES_NACIONAL"}:
+        return "Regime tributario nao permitido para emissao neste fluxo. Use MEI ou Simples Nacional."
+    if empresa.get("optanteSimples") is False:
+        return "Empresa nao marcada como optante do Simples Nacional/MEI."
+    return None
+
+
+def validar_payload_nfse(data: NotaServicoIn) -> Optional[str]:
+    if data.tipo.lower() != "servico":
+        return "Tipo de nota invalido. Envie tipo igual a servico."
+    if not data.tomador.nome.strip():
+        return "Informe o nome do tomador."
+    if not documento_tomador_valido(data.tomador.documento):
+        return "Documento do tomador invalido. Envie CPF ou CNPJ somente com numeros."
+    if data.tomador.email and not validar_email(data.tomador.email):
+        return "Email do tomador invalido."
+    if not data.servico.descricao.strip():
+        return "Informe a descricao do servico."
+    if data.servico.valor <= 0:
+        return "Valor do servico deve ser maior que zero."
+    if not data.servico.codigoMunicipalServico.strip():
+        return "Informe o codigo municipal do servico."
+    return None
+
+
+def montar_payload_fiscal(data: NotaServicoIn, empresa: dict) -> dict:
+    return {
+        "ambiente": fiscal_config()["ambiente"],
+        "empresa": {
+            "uuid": empresa["uuid"],
+            "cnpj": apenas_digitos(empresa["cnpj"]),
+            "razaoSocial": empresa.get("razaoSocial"),
+            "nomeFantasia": empresa.get("nomeFantasia"),
+            "municipio": empresa.get("municipio"),
+            "uf": empresa.get("uf"),
+            "cnae": empresa.get("cnae"),
+            "regimeTributario": empresa.get("regimeTributario") or "MEI",
+            "optanteSimples": empresa.get("optanteSimples"),
+        },
+        "tomador": {
+            "nome": data.tomador.nome.strip(),
+            "documento": apenas_digitos(data.tomador.documento),
+            "email": data.tomador.email,
+        },
+        "servico": {
+            "descricao": data.servico.descricao.strip(),
+            "valor": data.servico.valor,
+            "codigoMunicipalServico": data.servico.codigoMunicipalServico.strip(),
+        },
+    }
+
+
+def emitir_nfse_servico(payload_fiscal: dict) -> dict:
+    config = fiscal_config()
+    if config["ambiente"] == "producao" and not config["emissao_real_habilitada"]:
+        return {
+            "sucesso": False,
+            "status": "BLOQUEADA",
+            "mensagem": "Emissao real bloqueada. Configure FISCAL_EMISSAO_REAL_HABILITADA=true para liberar producao.",
+            "erroFiscal": "PRODUCAO_SEM_FLAG",
+        }
+
+    if config["base_url"] and config["token"]:
+        try:
+            response = requests.post(
+                f"{config['base_url']}/notas/servico",
+                json=payload_fiscal,
+                headers={"Authorization": f"Bearer {config['token']}"},
+                timeout=30,
+            )
+            response.raise_for_status()
+            fiscal = response.json()
+            return {
+                "sucesso": bool(fiscal.get("sucesso", True)),
+                "status": fiscal.get("status", "PROCESSANDO"),
+                "mensagem": fiscal.get("mensagem"),
+                "numero": fiscal.get("numero"),
+                "codigoVerificacao": fiscal.get("codigoVerificacao"),
+                "urlPdf": fiscal.get("urlPdf"),
+                "urlXml": fiscal.get("urlXml"),
+                "urlConsulta": fiscal.get("urlConsulta"),
+                "protocolo": fiscal.get("protocolo") or fiscal.get("id") or fiscal.get("uuid"),
+                "erroFiscal": fiscal.get("erroFiscal"),
+            }
+        except requests.RequestException as exc:
+            return {
+                "sucesso": False,
+                "status": "ERRO",
+                "mensagem": "Falha ao comunicar com o provedor fiscal. Tente novamente em alguns minutos.",
+                "erroFiscal": str(exc),
+            }
+
+    if config["ambiente"] == "homologacao" and config["mock_homologacao"]:
+        protocolo = hashlib.sha256(json.dumps(payload_fiscal, sort_keys=True).encode()).hexdigest()[:16].upper()
+        return {
+            "sucesso": True,
+            "status": "AUTORIZADA",
+            "mensagem": "NFS-e autorizada em homologacao local. Configure FISCAL_API_BASE_URL e FISCAL_API_TOKEN para usar o provedor fiscal.",
+            "numero": f"HOM-{protocolo[:8]}",
+            "codigoVerificacao": protocolo,
+            "urlPdf": None,
+            "urlXml": None,
+            "urlConsulta": None,
+            "protocolo": protocolo,
+            "erroFiscal": None,
+        }
+
+    return {
+        "sucesso": False,
+        "status": "CONFIGURACAO_PENDENTE",
+        "mensagem": "Provedor fiscal nao configurado. Defina FISCAL_API_BASE_URL e FISCAL_API_TOKEN em homologacao.",
+        "erroFiscal": "FISCAL_PROVIDER_NOT_CONFIGURED",
+    }
+
+
+def salvar_historico_nfse(empresa_uuid: str, payload: dict, resultado: dict) -> str:
+    nota_id = hashlib.sha256(f"{empresa_uuid}:{json.dumps(payload, sort_keys=True)}:{datetime.utcnow().isoformat()}".encode()).hexdigest()
+    agora = int(datetime.utcnow().timestamp() * 1000)
+    config = fiscal_config()
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO notas_servico
+            (id, empresauuid, payload_enviado, status, numero, codigo_verificacao,
+             url_pdf, url_xml, url_consulta, protocolo, erro_fiscal, ambiente,
+             provedor, data_criacao, data_atualizacao)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        """, (
+            nota_id,
+            empresa_uuid,
+            Json(payload),
+            resultado.get("status") or "ERRO",
+            resultado.get("numero"),
+            resultado.get("codigoVerificacao"),
+            resultado.get("urlPdf"),
+            resultado.get("urlXml"),
+            resultado.get("urlConsulta"),
+            resultado.get("protocolo"),
+            resultado.get("erroFiscal"),
+            config["ambiente"],
+            config["provedor"],
+            agora,
+            agora,
+        ))
+        conn.commit()
+        return nota_id
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        put_conn(conn)
+
+
+def tentar_salvar_historico_nfse(empresa_uuid: str, payload: dict, resultado: dict):
+    try:
+        salvar_historico_nfse(empresa_uuid, payload, resultado)
+    except Exception as exc:
+        print(f"Falha ao salvar historico de NFS-e: {exc}")
+
+
+def pydantic_to_dict(model):
+    if hasattr(model, "model_dump"):
+        return model.model_dump()
+    return model.dict()
+
 @app.on_event("startup")
 def startup(): 
     create_tables()
+
+
+# -------------------------------------------------------------------------------------
+# NOTAS FISCAIS DE SERVICO
+# =====================================================================================
+@app.post("/notas/servico", response_model=NotaServicoResponse)
+def emitir_nota_servico(data: NotaServicoIn, empresa_atual: str = Depends(get_empresa)):
+    if data.empresaUuid != empresa_atual:
+        tentar_salvar_historico_nfse(data.empresaUuid, pydantic_to_dict(data), {
+            "status": "ERRO_VALIDACAO",
+            "erroFiscal": "EMPRESA_DIFERENTE_DO_HEADER",
+        })
+        return NotaServicoResponse(
+            sucesso=False,
+            status="ERRO_VALIDACAO",
+            mensagem="Empresa da nota diferente da empresa autenticada."
+        )
+
+    erro_payload = validar_payload_nfse(data)
+    if erro_payload:
+        tentar_salvar_historico_nfse(data.empresaUuid, pydantic_to_dict(data), {
+            "status": "ERRO_VALIDACAO",
+            "erroFiscal": erro_payload,
+        })
+        return NotaServicoResponse(
+            sucesso=False,
+            status="ERRO_VALIDACAO",
+            mensagem=erro_payload
+        )
+
+    empresa = buscar_empresa_fiscal(data.empresaUuid)
+    erro_empresa = validar_empresa_para_nfse(empresa)
+    if erro_empresa:
+        tentar_salvar_historico_nfse(data.empresaUuid, pydantic_to_dict(data), {
+            "status": "ERRO_VALIDACAO",
+            "erroFiscal": erro_empresa,
+        })
+        return NotaServicoResponse(
+            sucesso=False,
+            status="ERRO_VALIDACAO",
+            mensagem=erro_empresa
+        )
+
+    payload_fiscal = montar_payload_fiscal(data, empresa)
+    resultado = emitir_nfse_servico(payload_fiscal)
+
+    try:
+        salvar_historico_nfse(data.empresaUuid, payload_fiscal, resultado)
+    except Exception as exc:
+        return NotaServicoResponse(
+            sucesso=False,
+            status="ERRO",
+            mensagem=f"Nota processada pelo fiscal, mas falhou ao salvar historico: {exc}"
+        )
+
+    return NotaServicoResponse(
+        sucesso=resultado.get("sucesso", False),
+        status=resultado.get("status", "ERRO"),
+        mensagem=resultado.get("mensagem"),
+        numero=resultado.get("numero"),
+        codigoVerificacao=resultado.get("codigoVerificacao"),
+        urlPdf=resultado.get("urlPdf"),
+        urlXml=resultado.get("urlXml"),
+        urlConsulta=resultado.get("urlConsulta"),
+    )
+
+
+@app.get("/notas/servico")
+def listar_notas_servico(empresa_atual: str = Depends(get_empresa)):
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, empresauuid, status, numero, codigo_verificacao,
+                   url_pdf, url_xml, url_consulta, protocolo, erro_fiscal,
+                   ambiente, provedor, data_criacao, data_atualizacao
+            FROM notas_servico
+            WHERE empresauuid = %s
+            ORDER BY data_criacao DESC
+        """, (empresa_atual,))
+        rows = cur.fetchall()
+        return [{
+            "id": row[0],
+            "empresaUuid": row[1],
+            "status": row[2],
+            "numero": row[3],
+            "codigoVerificacao": row[4],
+            "urlPdf": row[5],
+            "urlXml": row[6],
+            "urlConsulta": row[7],
+            "protocolo": row[8],
+            "erroFiscal": row[9],
+            "ambiente": row[10],
+            "provedor": row[11],
+            "dataCriacao": row[12],
+            "dataAtualizacao": row[13],
+        } for row in rows]
+    finally:
+        put_conn(conn)
+
+
+@app.get("/notas/servico/{nota_id}")
+def consultar_nota_servico(nota_id: str, empresa_atual: str = Depends(get_empresa)):
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, empresauuid, status, numero, codigo_verificacao,
+                   url_pdf, url_xml, url_consulta, protocolo, erro_fiscal,
+                   ambiente, provedor, data_criacao, data_atualizacao
+            FROM notas_servico
+            WHERE id = %s AND empresauuid = %s
+        """, (nota_id, empresa_atual))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(404, "Nota nao encontrada")
+        return {
+            "id": row[0],
+            "empresaUuid": row[1],
+            "status": row[2],
+            "numero": row[3],
+            "codigoVerificacao": row[4],
+            "urlPdf": row[5],
+            "urlXml": row[6],
+            "urlConsulta": row[7],
+            "protocolo": row[8],
+            "erroFiscal": row[9],
+            "ambiente": row[10],
+            "provedor": row[11],
+            "dataCriacao": row[12],
+            "dataAtualizacao": row[13],
+        }
+    finally:
+        put_conn(conn)
     
     
 # -------------------------------------------------------------------------------------
@@ -1795,103 +2236,3 @@ def redefinir_senha(valida: ValidarSenha):
     finally:
         put_conn(conn)
     
-    
-
-def enviar_nota(xml):
-    print("\n========== XML CRU RECEBIDO DO APP ==========", flush=True)
-    print(xml, flush=True)
-    print("========== FIM XML CRU ==========\n", flush=True)
-
-    response = nfe.emitir_nfce(xml)
-
-    print("\n========== RESPONSE COMPLETO NF-e ==========", flush=True)
-    print(json.dumps(response, indent=2, ensure_ascii=False), flush=True)
-    print("========== FIM RESPONSE NF-e ==========\n", flush=True)
-
-    if isinstance(response, dict):
-        if response.get("xml_assinado"):
-            print("\n========== XML ASSINADO ==========", flush=True)
-            print(response.get("xml_assinado"), flush=True)
-            print("========== FIM XML ASSINADO ==========\n", flush=True)
-
-        if response.get("lote"):
-            print("\n========== LOTE enviNFe ==========", flush=True)
-            print(response.get("lote"), flush=True)
-            print("========== FIM LOTE ==========\n", flush=True)
-
-        if response.get("envelope"):
-            print("\n========== SOAP ENVELOPE ==========", flush=True)
-            print(response.get("envelope"), flush=True)
-            print("========== FIM SOAP ==========\n", flush=True)
-
-    return response
-
-
-@app.post("/notafiscal")
-def criar_nota(nota: NotaFiscal):
-    conn = None
-    cur = None
-
-    try:
-        conn = get_conn()
-        cur = conn.cursor()
-
-        # evita duplicidade (IDEMPOTENTE)
-        cur.execute(
-            "SELECT 1 FROM nota_fiscal WHERE uuid = %s",
-            (nota.uuid,)
-        )
-        if cur.fetchone():
-            return {
-                "success": True,
-                "message": "Nota já existe",
-                "uuid": nota.uuid
-            }
-
-
-        # xml_assinada = assinar_xml(nota.xml, os.getenv("PFX_PATH"), os.getenv("PFX_PASSWORD"))
-        # INSERT
-        cur.execute("""
-            INSERT INTO nota_fiscal (
-                uuid,
-                id_venda,
-                tipo,
-                xml,
-                status,
-                criado_em
-            ) VALUES (%s, %s, %s, %s, %s, %s)
-        """, (
-            nota.uuid,
-            nota.id_venda,
-            nota.tipo,
-            nota.xml,
-            nota.status,
-            datetime.now()
-        ))
-
-        conn.commit()
-        response = enviar_nota(nota.xml)
-        
-        # logger.info(f"response: {response}")
-        
-        return {
-            "success": True,
-            "message": "Nota fiscal salva com sucesso",
-            "uuid": nota.uuid
-        }
-
-    except Exception as e:
-        if conn:
-            print("erro aqui: ", e)
-            conn.rollback()
-
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
-
-    finally:
-        if cur:
-            cur.close()          # FECHA CURSOR
-        if conn:
-            put_conn(conn)       # DEVOLVE PRO POOL
