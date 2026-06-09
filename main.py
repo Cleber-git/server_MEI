@@ -342,6 +342,7 @@ def cnpj_valido(cnpj: str) -> bool:
 
 
 def documento_tomador_valido(documento: str) -> bool:
+    print(documento)
     documento = apenas_alfanumericos(documento)
     if not documento:
         return False
@@ -432,6 +433,7 @@ def validar_payload_nfse(data: NotaServicoIn) -> Optional[str]:
     if not data.tomador.nome.strip():
         return "Informe o nome do tomador."
     if not documento_tomador_valido(data.tomador.documento):
+        
         return "Documento do tomador invalido. Envie CPF, CNPJ ou documento alfanumerico."
     if data.tomador.email and not validar_email(data.tomador.email):
         return "Email do tomador invalido."
