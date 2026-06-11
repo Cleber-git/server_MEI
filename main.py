@@ -597,6 +597,7 @@ def startup():
 # =====================================================================================
 @app.post("/notas/servico", response_model=NotaServicoResponse)
 def emitir_nota_servico(data: NotaServicoIn, empresa_atual: str = Depends(get_empresa)):
+    print(data)
     if data.empresaUuid != empresa_atual:
         tentar_salvar_historico_nfse(data.empresaUuid, pydantic_to_dict(data), {
             "status": "ERRO_VALIDACAO",
