@@ -16,8 +16,9 @@ from email.mime.text import MIMEText
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 import hashlib
+from pathlib import Path
 from psycopg2.extras import Json
 try:
     import nfe
@@ -31,6 +32,10 @@ except ImportError:
 # ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 app = FastAPI()
+
+KARAVAGGIO_DEMO_PREFIX = os.getenv("KARAVAGGIO_DEMO_PREFIX", "apresentacao").strip("/") or "apresentacao"
+KARAVAGGIO_DEMO_TOKEN = os.getenv("KARAVAGGIO_DEMO_TOKEN", "karavaggio-preview-2026").strip("/") or "karavaggio-preview-2026"
+KARAVAGGIO_SITE_DIR = (Path(__file__).resolve().parent / "site-karavaggio").resolve()
 
 
 def get_empresa(validation_uuid: str = Header(alias="validation-uuid")):
@@ -52,6 +57,10 @@ async def validar_empresa(request: Request, call_next):
         "/codigoSenha",
         "/login"
     ]
+
+    karavaggio_demo_base = f"/{KARAVAGGIO_DEMO_PREFIX}"
+    if path == karavaggio_demo_base or path.startswith(f"{karavaggio_demo_base}/"):
+        return await call_next(request)
 
     chave = request.headers.get("validation-uuid")
     chave_env = os.getenv("key_first_acess")
@@ -106,6 +115,41 @@ async def validar_empresa(request: Request, call_next):
 @app.get("/")
 def read_root():
     return {"status": "ok"}
+
+def validar_acesso_karavaggio(access_key: str):
+    if access_key != KARAVAGGIO_DEMO_TOKEN:
+        raise HTTPException(status_code=404, detail="Pagina nao encontrada")
+
+
+def arquivo_karavaggio(caminho: str = "index.html"):
+    alvo = (KARAVAGGIO_SITE_DIR / caminho).resolve()
+    try:
+        alvo.relative_to(KARAVAGGIO_SITE_DIR)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Arquivo nao encontrado")
+
+    if not alvo.is_file():
+        raise HTTPException(status_code=404, detail="Arquivo nao encontrado")
+
+    return alvo
+
+
+@app.get(f"/{KARAVAGGIO_DEMO_PREFIX}/{{access_key}}", include_in_schema=False)
+def abrir_site_karavaggio(access_key: str):
+    validar_acesso_karavaggio(access_key)
+    return RedirectResponse(url=f"/{KARAVAGGIO_DEMO_PREFIX}/{access_key}/", status_code=307)
+
+
+@app.get(f"/{KARAVAGGIO_DEMO_PREFIX}/{{access_key}}/", include_in_schema=False)
+def site_karavaggio(access_key: str):
+    validar_acesso_karavaggio(access_key)
+    return FileResponse(arquivo_karavaggio())
+
+
+@app.get(f"/{KARAVAGGIO_DEMO_PREFIX}/{{access_key}}/{{caminho:path}}", include_in_schema=False)
+def site_karavaggio_assets(access_key: str, caminho: str):
+    validar_acesso_karavaggio(access_key)
+    return FileResponse(arquivo_karavaggio(caminho))
 
 def create_tables():
     try:
