@@ -363,7 +363,7 @@ def cpf_valido(cpf: str) -> bool:
         return False
 
     def digito(corte: int) -> int:
-        soma = sum(int(cpf[i]) * (corte + 1 - i) for i in range(corte - 1))
+        soma = sum(int(cpf[i]) * (corte - i) for i in range(corte - 1))
         resto = (soma * 10) % 11
         return 0 if resto == 10 else resto
 
@@ -386,7 +386,6 @@ def cnpj_valido(cnpj: str) -> bool:
 
 
 def documento_tomador_valido(documento: str) -> bool:
-    print(documento)
     documento = apenas_alfanumericos(documento)
     if not documento:
         return False
