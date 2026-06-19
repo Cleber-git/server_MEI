@@ -1,3 +1,111 @@
+@font-face {
+  font-family: "Avenir Next Karavaggio";
+  src:
+    url("Fontes/Avenir-Next _ Textos e apoio/AvenirNextCyr-Regular.woff2") format("woff2"),
+    url("Fontes/Avenir-Next _ Textos e apoio/AvenirNextCyr-Regular.woff") format("woff");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Avenir Next Karavaggio";
+  src:
+    url("Fontes/Avenir-Next _ Textos e apoio/AvenirNextCyr-Italic.woff2") format("woff2"),
+    url("Fontes/Avenir-Next _ Textos e apoio/AvenirNextCyr-Italic.woff") format("woff");
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Avenir Next Karavaggio";
+  src:
+    url("Fontes/Avenir-Next _ Textos e apoio/AvenirNextCyr-Medium.woff2") format("woff2"),
+    url("Fontes/Avenir-Next _ Textos e apoio/AvenirNextCyr-Medium.woff") format("woff");
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Avenir Next Karavaggio";
+  src:
+    url("Fontes/Avenir-Next _ Textos e apoio/AvenirNextCyr-Demi.woff2") format("woff2"),
+    url("Fontes/Avenir-Next _ Textos e apoio/AvenirNextCyr-Demi.woff") format("woff");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Avenir Next Karavaggio";
+  src:
+    url("Fontes/Avenir-Next _ Textos e apoio/AvenirNextCyr-Bold.woff2") format("woff2"),
+    url("Fontes/Avenir-Next _ Textos e apoio/AvenirNextCyr-Bold.woff") format("woff");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Avenir Next Karavaggio";
+  src:
+    url("Fontes/Avenir-Next _ Textos e apoio/AvenirNextCyr-Heavy.woff2") format("woff2"),
+    url("Fontes/Avenir-Next _ Textos e apoio/AvenirNextCyr-Heavy.woff") format("woff");
+  font-style: normal;
+  font-weight: 800 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "P22 Mackinac Karavaggio";
+  src: url("Fontes/P22-Macknac _ T%C3%ADtulos/P22MackinacPro-Book_25.otf") format("opentype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "P22 Mackinac Karavaggio";
+  src: url("Fontes/P22-Macknac _ T%C3%ADtulos/P22MackinacPro-BookItalic_15.otf") format("opentype");
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "P22 Mackinac Karavaggio";
+  src: url("Fontes/P22-Macknac _ T%C3%ADtulos/P22MackinacPro-Medium_26.otf") format("opentype");
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "P22 Mackinac Karavaggio";
+  src: url("Fontes/P22-Macknac _ T%C3%ADtulos/P22MackinacPro-MedItalic_18.otf") format("opentype");
+  font-style: italic;
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "P22 Mackinac Karavaggio";
+  src: url("Fontes/P22-Macknac _ T%C3%ADtulos/P22MackinacPro-Bold_16.otf") format("opentype");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "P22 Mackinac Karavaggio";
+  src: url("Fontes/P22-Macknac _ T%C3%ADtulos/P22MackinacPro-ExtraBold_12.otf") format("opentype");
+  font-style: normal;
+  font-weight: 800 900;
+  font-display: swap;
+}
+
 :root {
   --bg: #eeeeee;
   --green: #073f27;
@@ -8,9 +116,9 @@
   --white: #ffffff;
   --page-x: clamp(72px, 7.5vw, 128px);
   --shadow: 18px 20px 24px rgba(0, 0, 0, 0.24);
-  --font-body: "AvenirNextCyr", "Avenir Next Cyr", "Avenir Next", Avenir, Montserrat, "Segoe UI", Arial, sans-serif;
-  --font-display: "P22MackinacPro", "P22 Mackinac Pro", Georgia, "Times New Roman", serif;
-  --font-script: "Great Vibes", "P22MackinacPro", "P22 Mackinac Pro", cursive;
+  --font-body: "Avenir Next Karavaggio", "Avenir Next", Avenir, "Segoe UI", Arial, sans-serif;
+  --font-display: "P22 Mackinac Karavaggio", Georgia, "Times New Roman", serif;
+  --font-script: "P22 Mackinac Karavaggio", Georgia, "Times New Roman", serif;
   font-family: var(--font-body);
   color: var(--text);
   background: var(--bg);
@@ -142,9 +250,14 @@ button {
   text-transform: none;
 }
 
+.hero-badge {
+  width: min(303px, 100%);
+  height: auto;
+}
+
 .pill em {
   margin-left: 8px;
-  font: 400 34px var(--font-script);
+  font: italic 500 34px var(--font-script);
   text-transform: none;
 }
 
@@ -153,6 +266,7 @@ h2,
 h3 {
   margin: 0;
   font-family: var(--font-display);
+  font-weight: 500;
   color: var(--green-2);
   line-height: 1.08;
   overflow-wrap: break-word;
@@ -240,7 +354,11 @@ p {
 .history-media {
   display: grid;
   grid-template-columns: 1fr;
+  grid-template-rows: repeat(3, minmax(0, 1fr));
   gap: 12px;
+  height: calc(100svh - 128px - 112px);
+  min-height: 456px;
+  max-height: 756px;
   padding-top: 26px;
 }
 
@@ -248,7 +366,8 @@ p {
 .history-media img:first-child {
   grid-column: auto;
   width: 100%;
-  height: clamp(150px, 13.8vw, 260px);
+  height: 100%;
+  min-height: 0;
   object-fit: cover;
   border-radius: 8px;
   box-shadow: none;
@@ -472,6 +591,59 @@ form button {
   align-self: center;
 }
 
+.contact {
+  grid-template-columns: minmax(420px, 1fr) minmax(460px, 1.08fr);
+  gap: clamp(54px, 6vw, 76px);
+  width: min(calc(100% - 10vw), 1150px);
+  min-height: calc(100svh - 128px);
+  margin-inline: auto;
+  padding: 34px 0 50px;
+}
+
+.contact .form-card {
+  gap: 16px;
+}
+
+.contact .form-card label {
+  gap: 12px;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.contact .form-card input {
+  min-height: 68px;
+}
+
+.contact .form-card textarea {
+  min-height: 196px;
+}
+
+.contact .form-card button {
+  min-width: 178px;
+  padding-block: 12px;
+  font-size: 26px;
+  text-transform: none;
+}
+
+.contact-copy .pill {
+  padding: 7px 12px;
+  border-radius: 9px;
+  font-size: 20px;
+}
+
+.contact .contact-copy h2 {
+  margin-top: 12px;
+  padding-bottom: 14px;
+  font-size: clamp(42px, 4vw, 52px);
+  line-height: 1.12;
+}
+
+.contact-copy p {
+  margin: 22px 0 0;
+  font-size: clamp(19px, 1.7vw, 22px);
+  line-height: 1.52;
+}
+
 .contact-copy h2,
 .units-copy h2,
 .quote-heading h2,
@@ -479,12 +651,13 @@ form button {
   margin: 14px 0 20px;
   padding-bottom: 22px;
   border-bottom: 3px solid var(--gold);
+  font-weight: bold ;
 }
 
 .units {
   min-height: 640px;
   align-items: center;
-  gap: clamp(48px, 7vw, 96px);
+  gap: clamp(12px, 2vw, 28px);
   padding-top: 30px;
   padding-bottom: 34px;
 }
@@ -509,11 +682,27 @@ form button {
   line-height: 1.35;
 }
 
-.contact-copy a {
-  display: block;
+.contact-links {
+  display: grid;
+  gap: 18px;
   margin-top: 24px;
+}
+
+.contact-links a {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  margin: 0;
   font-size: 21px;
-  font-weight: 700;
+  font-weight: 500;
+}
+
+.contact-links img {
+  flex: 0 0 52px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
 .quote {
@@ -747,6 +936,12 @@ form button {
   margin-bottom: 28px;
 }
 
+.units .units-map {
+  width: min(980px, 170%);
+  max-width: none;
+  margin-left: 2%;
+}
+
 .units-copy {
   max-width: 520px;
 }
@@ -944,6 +1139,18 @@ form button {
     grid-template-columns: 1fr;
   }
 
+  .contact {
+    width: 100%;
+    min-height: auto;
+    padding: 42px 5vw;
+  }
+
+  .units .units-map {
+    width: min(620px, 100%);
+    max-width: 100%;
+    margin-left: 0;
+  }
+
   .hero-media,
   .quote-form {
     grid-template-columns: 1fr;
@@ -957,6 +1164,14 @@ form button {
   .unit-grid,
   .success-notes {
     grid-template-columns: 1fr;
+  }
+
+  .history-media {
+    grid-template-rows: none;
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    padding-top: 0;
   }
 
   .operation-gallery img {

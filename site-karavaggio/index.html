@@ -27,8 +27,14 @@
     <main>
       <section id="inicio" class="section hero">
         <div class="hero-copy">
-          <span class="pill">Sua carga em <em>boas mãos</em></span>
-          <h1>Legado e comprometimento</h1>
+          <img
+            class="hero-badge"
+            src="%C3%8Dcones/Sua%20carga%20em%20boas%20m%C3%A3os%20_%20Inicio.png"
+            alt="Sua carga em boas mãos"
+            width="303"
+            height="71"
+          >
+          <h1 style="font-weight: 900;">Legado e comprometimento</h1>
           <p>Com fé no caminho e compromisso no serviço, transportamos mais que cargas, carregamos integridade, precisão e respeito em cada quilômetro percorrido.</p>
         </div>
         <div class="hero-media" aria-label="Frota Karavaggio">
@@ -40,14 +46,14 @@
       <section id="sobre" class="section about">
         <div class="about-copy">
           <div class="title-line">
-            <h2>Sua carga em boas mãos</h2>
+            <h2 style="font-weight: 700;">Sua carga em boas mãos</h2>
           </div>
           <p>Com mais de duas décadas de experiência no setor logístico, a Transportadora Karavaggio conta com dois Centros de Distribuição próprios, estrategicamente localizados em Vargem Grande Paulista (SP) e Cachoeirinha (RS). Ambos os CD's oferecem fácil acesso às principais rodovias e estradas federais, garantindo agilidade e eficiência nas operações.</p>
           <ul class="feature-list">
-            <li style="margin-bottom: -30px ;"><img src="certoverde.png" alt="Certo" width="120" height="80" style="margin-right: -35px; ">Segurança total com seguro de carga</li>
-            <li style="margin-bottom: -30px ;"><img src="money.png" alt="Certo" width="120" height="80" style="margin-right: -35px; "> Melhor custo benefício</li>
-            <li style="margin-bottom: -30px ;"><img src="maodada.png" alt="Certo" width="120" height="80" style="margin-right: -35px; "> Confiabilidade e transparência</li>
-            <li style="margin-bottom: -30px ;"><img src="suporte.png" alt="Certo" width="120" height="80" style="margin-right: -35px; "> Atendimento personalizado</li>
+            <li style="margin-bottom: -30px ;"><img src="certoverde.png" alt="Certo" width="100" height="80" style="margin-right: -0px; ">Segurança total com seguro de carga</li>
+            <li style="margin-bottom: -30px ;"><img src="money.png" alt="Certo" width="180" height="95" style="margin-right: -35px; margin-left: -40px;">Melhor custo benefício</li>
+            <li style="margin-bottom: -30px ;"><img src="maodada.png" alt="Certo" width="100" height="80" style="margin-right: 0px; "> Confiabilidade e transparência</li>
+            <li style="margin-bottom: -30px ;"><img src="suporte.png" alt="Certo" width="100" height="80" style="margin-right: -0px; "> Atendimento personalizado</li>
           </ul>
         </div>
         <div class="about-media">
@@ -73,7 +79,7 @@
 
       <section id="servicos" class="section services">
         <div class="section-title">
-          <h2>Serviços oferecidos</h2>
+          <h2 style="font-weight: 800;">Serviços oferecidos</h2>
         </div>
         <div class="services-carousel" aria-label="Carrossel de serviços oferecidos">
           <button class="carousel-button carousel-prev" type="button" aria-label="Serviço anterior">‹</button>
@@ -132,17 +138,35 @@
         </form>
         <div class="contact-copy">
           <span class="pill">Logística humanizada</span>
-          <h2>Sua operação merece atenção de verdade</h2>
+          <h2 style="font-weight: 800;">Sua operação merece atenção de verdade</h2>
           <p>Mais do que transportar cargas, buscamos construir parcerias sólidas através de operações seguras, monitoradas e alinhadas às necessidades de cada cliente. Fale com nossa equipe e conheça a excelência logística da Transportadora Karavaggio.</p>
-          <a href="tel:+551124415041">(11) 2441-5041</a>
-          <a href="mailto:sac@karavaggio.com.br">sac@karavaggio.com.br</a>
+          <div class="contact-links">
+            <a href="tel:+551124415041">
+              <img
+                src="%C3%8Dcones/Telefone%20_%20Contato.png"
+                alt=""
+                width="52"
+                height="52"
+              >
+              <span>(11) 2441-5041</span>
+            </a>
+            <a href="mailto:sac@karavaggio.com.br">
+              <img
+                src="%C3%8Dcones/E-mail%20_%20Contato.png"
+                alt=""
+                width="52"
+                height="52"
+              >
+              <span>sac@karavaggio.com.br</span>
+            </a>
+          </div>
         </div>
       </section>
 
       <template id="contato-sucesso">
         <div class="success-section inline-success" tabindex="-1">
         <div class="success-mark" aria-hidden="true"><img src="certoMsg.png" alt="" width="500" height="350"></div>
-        <h2>Mensagem enviada com sucesso!</h2>
+        <h2 style="font-weight: 800;">Mensagem enviada com sucesso!</h2>
         <p>Recebemos as suas informações e nossa equipe já está analisando a sua solicitação. Em breve entraremos em contato!</p>
         <div class="success-notes">
           <span>Nossa equipe entrará em contato com o melhor preço para sua operação!</span>
@@ -152,9 +176,9 @@
       </template>
 
       <section id="unidades" class="section units">
-        <img src="assets/mapa-sul.png" alt="Mapa de atendimento no Sul do Brasil">
+        <img class="units-map" src="assets/mapa-sul.png" alt="Mapa de atendimento no Sul do Brasil">
         <div class="units-copy">
-          <span class="pill">Cobertura que conecta</span>
+          <span class="pill" style="font-weight: 600;">Cobertura que conecta</span>
           <h2>Onde você precisa, com quem entende</h2>
           <p>Atendemos com excelência na distribuição para toda a região Sul do Brasil, com agilidade e eficiência.</p>
           <label>Cidades de entrega<input type="search" placeholder="Digite o nome da cidade"></label>
@@ -164,7 +188,7 @@
 
       <section id="nossas-unidades" class="section unit-grid-section">
         <div class="section-title">
-          <h2>Nossas unidades</h2>
+          <h2 style="font-weight: 800;">Nossas unidades</h2>
         </div>
         <div class="unit-grid">
           <article class="unit-card">
@@ -214,24 +238,24 @@
           <h2>Calcule sua operação</h2>
         </div>
         <form class="quote-form" data-success-target="cotacao-sucesso">
-          <label>CNPJ do pagador<input type="text" placeholder="00.000.000/0000-00" required></label>
+          <label style="font-weight: 700;">CNPJ do pagador<input type="text" placeholder="00.000.000/0000-00" required></label>
           <div class="form-group">
             <h3>Dados de origem</h3>
-            <label>CNPJ de origem<input type="text" placeholder="00.000.000/0000-00"></label>
-            <label>Cidade e estado de origem<input type="text" placeholder="Digite o nome da cidade"></label>
+            <label style="font-weight: 700;">CNPJ de origem<input type="text" placeholder="00.000.000/0000-00"></label>
+            <label style="font-weight: 700;">Cidade e estado de origem<input type="text" placeholder="Digite o nome da cidade"></label>
           </div>
           <div class="form-group">
             <h3>Dados de destino</h3>
-            <label>CNPJ de destino<input type="text" placeholder="00.000.000/0000-00"></label>
-            <label>Cidade e estado de destino<input type="text" placeholder="Digite o nome da cidade"></label>
+            <label style="font-weight: 700;">CNPJ de destino<input type="text" placeholder="00.000.000/0000-00"></label>
+            <label style="font-weight: 700;">Cidade e estado de destino<input type="text" placeholder="Digite o nome da cidade"></label>
           </div>
           <div class="invoice-group">
             <h3>Dados da nota fiscal</h3>
-            <label>Valor total da Nota Fiscal<input type="text" placeholder="R$ 000,00"></label>
-            <label>Quantidade de volumes<input type="number" placeholder="000"></label>
-            <label>Peso bruto<input type="text" placeholder="000,00 kg"></label>
-            <label class="wide">Cubagem da mercadoria<input type="text" placeholder="Gentileza informar as dimensões das caixas ou pallets. Em caso de já obter a cubagem total, informar a cubagem total dos produtos."></label>
-            <label class="wide">Observações e comentários<textarea></textarea></label>
+            <label style="font-weight: 700;">Valor total da Nota Fiscal<input type="text" placeholder="R$ 000,00"></label>
+            <label style="font-weight: 700;">Quantidade de volumes<input type="number" placeholder="000"></label>
+            <label style="font-weight: 700;">Peso bruto<input type="text" placeholder="000,00 kg"></label>
+            <label class="wide" style="font-weight: 700;">Cubagem da mercadoria<input type="text" placeholder="Gentileza informar as dimensões das caixas ou pallets. Em caso de já obter a cubagem total, informar a cubagem total dos produtos."></label>
+            <label class="wide" style="font-weight: 700;">Observações e comentários<textarea></textarea></label>
           </div>
           <button type="submit">Enviar</button>
         </form>
