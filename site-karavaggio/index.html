@@ -21,7 +21,9 @@
         <a href="#cotacao">Cotação</a>
         <a href="#unidades">Unidades</a>
       </nav>
-      <a class="track-button" href="#rastreamento">Rastreamento <span aria-hidden="true">-></span></a>
+      <a class="track-button" href="#rastreamento" aria-label="Rastreamento">
+        <img src="Rastreamento.png" alt="">
+      </a>
     </header>
 
     <main>
@@ -181,8 +183,11 @@
           <span class="pill" style="font-weight: 600;">Cobertura que conecta</span>
           <h2>Onde você precisa, com quem entende</h2>
           <p>Atendemos com excelência na distribuição para toda a região Sul do Brasil, com agilidade e eficiência.</p>
-          <label>Cidades de entrega<input type="search" placeholder="Digite o nome da cidade"></label>
-          <label>Cidades de coleta<input type="search" placeholder="Digite o nome da cidade"></label>
+          <label>Cidades de entrega<input id="delivery-city" type="search" list="delivery-area-options" placeholder="Digite o nome da cidade"></label>
+          <div id="delivery-city-result" class="area-result" aria-live="polite" hidden></div>
+          <label>Cidades de coleta<input id="pickup-city" type="search" list="delivery-area-options" placeholder="Digite o nome da cidade"></label>
+          <div id="pickup-city-result" class="area-result" aria-live="polite" hidden></div>
+          <datalist id="delivery-area-options"></datalist>
         </div>
       </section>
 
@@ -242,12 +247,14 @@
           <div class="form-group">
             <h3>Dados de origem</h3>
             <label style="font-weight: 700;">CNPJ de origem<input type="text" placeholder="00.000.000/0000-00"></label>
-            <label style="font-weight: 700;">Cidade e estado de origem<input type="text" placeholder="Digite o nome da cidade"></label>
+            <label style="font-weight: 700;">Cidade e estado de origem<input id="quote-origin-city" type="text" list="delivery-area-options" placeholder="Digite o nome da cidade"></label>
+            <div id="quote-origin-city-result" class="area-result" aria-live="polite" hidden></div>
           </div>
           <div class="form-group">
             <h3>Dados de destino</h3>
             <label style="font-weight: 700;">CNPJ de destino<input type="text" placeholder="00.000.000/0000-00"></label>
-            <label style="font-weight: 700;">Cidade e estado de destino<input type="text" placeholder="Digite o nome da cidade"></label>
+            <label style="font-weight: 700;">Cidade e estado de destino<input id="quote-destination-city" type="text" list="delivery-area-options" placeholder="Digite o nome da cidade"></label>
+            <div id="quote-destination-city-result" class="area-result" aria-live="polite" hidden></div>
           </div>
           <div class="invoice-group">
             <h3>Dados da nota fiscal</h3>
@@ -274,19 +281,11 @@
       </template>
 
       <section id="rastreamento" class="section tracking">
-        <div>
-          <span class="pill">Rastreamento</span>
-          <h2>Acompanhe sua carga</h2>
-          <p>Informe seu código de rastreio para consultar o andamento da entrega.</p>
-        </div>
-        <form class="tracking-form" data-success="Consulta simulada. Entre em contato para detalhes da entrega.">
-          <label>Código de rastreio<input type="text" placeholder="Digite o código"></label>
-          <button type="submit">Consultar</button>
-          <p class="form-status" aria-live="polite"></p>
-        </form>
+        <img class="tracking-image" src="Rastreamento.png" alt="Rastreamento">
       </section>
     </main>
 
+    <script src="delivery-areas.js"></script>
     <script src="script.js"></script>
   </body>
 </html>

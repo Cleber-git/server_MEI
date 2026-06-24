@@ -50,12 +50,92 @@ document.querySelectorAll("form[data-success-target]").forEach((form) => {
   });
 });
 
+const deliveryAreas = Array.isArray(window.KARAVAGGIO_DELIVERY_AREAS)
+  ? window.KARAVAGGIO_DELIVERY_AREAS
+  : [];
+const deliveryOptions = document.getElementById("delivery-area-options");
+
+function normalizeSearchText(value) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .trim();
+}
+
+function getAreaLabel(area) {
+  return `${area.city} - ${area.uf}`;
+}
+
+function findDeliveryArea(value) {
+  const search = normalizeSearchText(value.replace(/\s+-\s+[A-Z]{2}$/i, ""));
+  const selectedUf = value.match(/\s+-\s+([A-Z]{2})$/i)?.[1]?.toUpperCase();
+
+  return deliveryAreas.find((area) => {
+    const sameCity = normalizeSearchText(area.city) === search;
+    const sameUf = !selectedUf || area.uf === selectedUf;
+    return sameCity && sameUf;
+  });
+}
+
+function renderAreaResult(target, area, typedValue) {
+  if (!target) return;
+
+  if (!typedValue.trim()) {
+    target.replaceChildren();
+    target.hidden = true;
+    return;
+  }
+
+  if (!area) {
+    target.innerHTML = "<strong>Cidade não encontrada</strong><span>Confira o nome ou selecione uma opção da lista.</span>";
+    target.hidden = false;
+    return;
+  }
+
+  target.innerHTML = `
+    <strong>${getAreaLabel(area)}</strong>
+    <span>Prazo: D+${area.prazo} dias úteis</span>
+    <span>Praça: ${area.praca} | Filial: ${area.filial}</span>
+    <span>Região: ${area.pracaComercial}</span>
+    <span>CEP: ${area.cepInicial} a ${area.cepFinal}</span>
+  `;
+  target.hidden = false;
+}
+
+function bindAreaLookup(inputId, resultId) {
+  const input = document.getElementById(inputId);
+  const result = document.getElementById(resultId);
+  if (!input || !result) return;
+
+  const updateResult = () => renderAreaResult(result, findDeliveryArea(input.value), input.value);
+
+  input.addEventListener("input", updateResult);
+  input.addEventListener("change", updateResult);
+}
+
+if (deliveryOptions && deliveryAreas.length) {
+  deliveryOptions.replaceChildren(
+    ...deliveryAreas.map((area) => {
+      const option = document.createElement("option");
+      option.value = getAreaLabel(area);
+      return option;
+    })
+  );
+}
+
+bindAreaLookup("delivery-city", "delivery-city-result");
+bindAreaLookup("pickup-city", "pickup-city-result");
+bindAreaLookup("quote-origin-city", "quote-origin-city-result");
+bindAreaLookup("quote-destination-city", "quote-destination-city-result");
+
 const carousel = document.querySelector(".services-carousel");
 const track = carousel?.querySelector(".service-cards");
 const cards = Array.from(carousel?.querySelectorAll(".service-card") || []);
 const previousButton = carousel?.querySelector(".carousel-prev");
 const nextButton = carousel?.querySelector(".carousel-next");
 let activeService = 1;
+let servicesAutoplay;
 
 function updateServicesCarousel() {
   if (!track || cards.length === 0) return;
@@ -74,15 +154,37 @@ function updateServicesCarousel() {
   });
 }
 
-previousButton?.addEventListener("click", () => {
+function showPreviousService() {
   activeService = (activeService - 1 + cards.length) % cards.length;
   updateServicesCarousel();
-});
+}
 
-nextButton?.addEventListener("click", () => {
+function showNextService() {
   activeService = (activeService + 1) % cards.length;
   updateServicesCarousel();
-});
+}
+
+function startServicesAutoplay() {
+  if (!carousel || cards.length <= 1 || servicesAutoplay) return;
+
+  servicesAutoplay = window.setInterval(showNextService, 4500);
+}
+
+function stopServicesAutoplay() {
+  window.clearInterval(servicesAutoplay);
+  servicesAutoplay = undefined;
+}
+
+previousButton?.addEventListener("click", showPreviousService);
+nextButton?.addEventListener("click", showNextService);
+
+carousel?.addEventListener("mouseenter", stopServicesAutoplay);
+carousel?.addEventListener("mouseleave", startServicesAutoplay);
+carousel?.addEventListener("focusin", stopServicesAutoplay);
+carousel?.addEventListener("focusout", startServicesAutoplay);
+carousel?.addEventListener("touchstart", stopServicesAutoplay, { passive: true });
+carousel?.addEventListener("touchend", startServicesAutoplay);
 
 window.addEventListener("resize", updateServicesCarousel);
 updateServicesCarousel();
+startServicesAutoplay();
