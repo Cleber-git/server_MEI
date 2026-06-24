@@ -217,8 +217,7 @@ button {
 .about,
 .history,
 .contact,
-.units,
-.tracking {
+.units {
   display: grid;
   grid-template-columns: minmax(280px, 1fr) minmax(360px, 1fr);
   align-items: center;
@@ -650,8 +649,7 @@ form button {
 
 .contact-copy h2,
 .units-copy h2,
-.quote-heading h2,
-.tracking h2 {
+.quote-heading h2 {
   margin: 14px 0 20px;
   padding-bottom: 22px;
   border-bottom: 3px solid var(--gold);
@@ -1101,18 +1099,6 @@ form button {
   text-transform: uppercase;
 }
 
-.tracking {
-  display: grid;
-  grid-template-columns: 1fr;
-  place-items: center;
-  min-height: 520px;
-}
-
-.tracking-image {
-  width: min(190px, 100%);
-  height: auto;
-}
-
 @media (max-width: 980px) {
   :root {
     --page-x: 5vw;
@@ -1165,8 +1151,7 @@ form button {
   .contact,
   .units,
   .unit-grid-section,
-  .clients,
-  .tracking {
+  .clients {
     grid-template-columns: 1fr;
   }
 
