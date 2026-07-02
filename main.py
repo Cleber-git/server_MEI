@@ -384,7 +384,6 @@ def cnpj_valido(cnpj: str) -> bool:
     segundo = digito([6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2], cnpj[:12] + str(primeiro))
     return primeiro == int(cnpj[12]) and segundo == int(cnpj[13])
 
-
 def documento_tomador_valido(documento: str) -> bool:
     documento = apenas_alfanumericos(documento)
     if not documento:
