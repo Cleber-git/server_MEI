@@ -13,6 +13,78 @@ mainMenu?.addEventListener("click", (event) => {
   }
 });
 
+function onlyDigits(value, maxLength) {
+  const digits = value.replace(/\D/g, "");
+  return typeof maxLength === "number" ? digits.slice(0, maxLength) : digits;
+}
+
+function formatCpfCnpj(value) {
+  const digits = onlyDigits(value, 14);
+
+  if (digits.length <= 11) {
+    return digits
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+  }
+
+  return digits
+    .replace(/^(\d{2})(\d)/, "$1.$2")
+    .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/\.(\d{3})(\d)/, ".$1/$2")
+    .replace(/(\d{4})(\d{1,2})$/, "$1-$2");
+}
+
+function formatMoney(value) {
+  const digits = onlyDigits(value);
+  if (!digits) return "";
+
+  const amount = Number(digits) / 100;
+  return amount.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: 2,
+  });
+}
+
+function formatWeight(value) {
+  const digits = onlyDigits(value);
+  if (!digits) return "";
+
+  const integerPart = digits.slice(0, -2) || "0";
+  const decimalPart = digits.slice(-2).padStart(2, "0");
+  return `${Number(integerPart).toLocaleString("pt-BR")},${decimalPart} kg`;
+}
+
+function formatPhone(value) {
+  const digits = onlyDigits(value, 11);
+
+  if (digits.length <= 10) {
+    return digits
+      .replace(/^(\d{2})(\d)/, "($1) $2")
+      .replace(/(\d{4})(\d{1,4})$/, "$1-$2");
+  }
+
+  return digits
+    .replace(/^(\d{2})(\d)/, "($1) $2")
+    .replace(/(\d{5})(\d{1,4})$/, "$1-$2");
+}
+
+function bindInstantMask(selector, formatter) {
+  document.querySelectorAll(selector).forEach((input) => {
+    input.addEventListener("input", () => {
+      input.value = formatter(input.value);
+    });
+  });
+}
+
+bindInstantMask("[data-document-mask]", formatCpfCnpj);
+bindInstantMask("[data-money-mask]", formatMoney);
+bindInstantMask("[data-weight-mask]", formatWeight);
+bindInstantMask("[data-phone-mask]", formatPhone);
+bindInstantMask("[data-integer-mask]", (value) => onlyDigits(value));
+bindInstantMask('input[type="email"]', (value) => value.replace(/\s/g, "").toLowerCase());
+
 document.querySelectorAll("form[data-success]").forEach((form) => {
   form.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -29,8 +101,16 @@ document.querySelectorAll("form[data-success]").forEach((form) => {
 });
 
 document.querySelectorAll("form[data-success-target]").forEach((form) => {
-  form.addEventListener("submit", (event) => {
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
+
+    try {
+      await sendQuoteEmail(form);
+    } catch (error) {
+      alert(error.message || "Não foi possível enviar a solicitação. Tente novamente.");
+      return;
+    }
+
     const template = document.getElementById(form.dataset.successTarget);
     if (!(template instanceof HTMLTemplateElement)) return;
 
@@ -49,6 +129,48 @@ document.querySelectorAll("form[data-success-target]").forEach((form) => {
     success.focus({ preventScroll: true });
   });
 });
+
+function getFieldValue(form, name) {
+  return form.elements[name]?.value?.trim() || "";
+}
+
+function getQuoteApiUrl() {
+  if (window.location.protocol === "file:") {
+    return "http://127.0.0.1:8000/api/cotacao";
+  }
+
+  return "/api/cotacao";
+}
+
+async function sendQuoteEmail(form) {
+  if (!form.dataset.mailto) return;
+
+  const payload = {
+    cnpj_pagador: getFieldValue(form, "cnpj_pagador"),
+    cnpj_origem: getFieldValue(form, "cnpj_origem"),
+    origem: getFieldValue(form, "origem"),
+    cnpj_destino: getFieldValue(form, "cnpj_destino"),
+    destino: getFieldValue(form, "destino"),
+    valor_nota: getFieldValue(form, "valor_nota"),
+    volumes: getFieldValue(form, "volumes"),
+    peso_bruto: getFieldValue(form, "peso_bruto"),
+    cubagem: getFieldValue(form, "cubagem"),
+    observacoes: getFieldValue(form, "observacoes"),
+  };
+
+  const response = await fetch(getQuoteApiUrl(), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.detail || "Falha ao enviar cotação.");
+  }
+}
 
 const deliveryAreas = Array.isArray(window.KARAVAGGIO_DELIVERY_AREAS)
   ? window.KARAVAGGIO_DELIVERY_AREAS
@@ -78,7 +200,7 @@ function findDeliveryArea(value) {
   });
 }
 
-function renderAreaResult(target, area, typedValue) {
+function renderAreaResult(target, area, typedValue, options = {}) {
   if (!target) return;
 
   if (!typedValue.trim()) {
@@ -93,22 +215,40 @@ function renderAreaResult(target, area, typedValue) {
     return;
   }
 
+  if (options.showDetails === false) {
+    target.replaceChildren();
+    target.hidden = true;
+    return;
+  }
+
+  const details = [];
+
+  if (options.showPrazo !== false) {
+    details.push(`<span>Prazo: D+${area.prazo} dias úteis</span>`);
+  }
+
+  if (options.showPraca !== false) {
+    details.push(`<span>Praça: ${area.praca} | Filial: ${area.filial}</span>`);
+  } else {
+    details.push(`<span>Filial: ${area.filial}</span>`);
+  }
+
+  details.push(`<span>Região: ${area.pracaComercial}</span>`);
+  details.push(`<span>CEP: ${area.cepInicial} a ${area.cepFinal}</span>`);
+
   target.innerHTML = `
     <strong>${getAreaLabel(area)}</strong>
-    <span>Prazo: D+${area.prazo} dias úteis</span>
-    <span>Praça: ${area.praca} | Filial: ${area.filial}</span>
-    <span>Região: ${area.pracaComercial}</span>
-    <span>CEP: ${area.cepInicial} a ${area.cepFinal}</span>
+    ${details.join("")}
   `;
   target.hidden = false;
 }
 
-function bindAreaLookup(inputId, resultId) {
+function bindAreaLookup(inputId, resultId, options = {}) {
   const input = document.getElementById(inputId);
   const result = document.getElementById(resultId);
   if (!input || !result) return;
 
-  const updateResult = () => renderAreaResult(result, findDeliveryArea(input.value), input.value);
+  const updateResult = () => renderAreaResult(result, findDeliveryArea(input.value), input.value, options);
 
   input.addEventListener("input", updateResult);
   input.addEventListener("change", updateResult);
@@ -124,10 +264,10 @@ if (deliveryOptions && deliveryAreas.length) {
   );
 }
 
-bindAreaLookup("delivery-city", "delivery-city-result");
-bindAreaLookup("pickup-city", "pickup-city-result");
-bindAreaLookup("quote-origin-city", "quote-origin-city-result");
-bindAreaLookup("quote-destination-city", "quote-destination-city-result");
+bindAreaLookup("delivery-city", "delivery-city-result", { showPraca: false });
+bindAreaLookup("pickup-city", "pickup-city-result", { showPraca: false, showPrazo: false });
+bindAreaLookup("quote-origin-city", "quote-origin-city-result", { showDetails: false });
+bindAreaLookup("quote-destination-city", "quote-destination-city-result", { showPraca: false });
 
 const carousel = document.querySelector(".services-carousel");
 const track = carousel?.querySelector(".service-cards");
@@ -135,7 +275,6 @@ const cards = Array.from(carousel?.querySelectorAll(".service-card") || []);
 const previousButton = carousel?.querySelector(".carousel-prev");
 const nextButton = carousel?.querySelector(".carousel-next");
 let activeService = 1;
-let servicesAutoplay;
 
 function updateServicesCarousel() {
   if (!track || cards.length === 0) return;
@@ -164,27 +303,8 @@ function showNextService() {
   updateServicesCarousel();
 }
 
-function startServicesAutoplay() {
-  if (!carousel || cards.length <= 1 || servicesAutoplay) return;
-
-  servicesAutoplay = window.setInterval(showNextService, 4500);
-}
-
-function stopServicesAutoplay() {
-  window.clearInterval(servicesAutoplay);
-  servicesAutoplay = undefined;
-}
-
 previousButton?.addEventListener("click", showPreviousService);
 nextButton?.addEventListener("click", showNextService);
 
-carousel?.addEventListener("mouseenter", stopServicesAutoplay);
-carousel?.addEventListener("mouseleave", startServicesAutoplay);
-carousel?.addEventListener("focusin", stopServicesAutoplay);
-carousel?.addEventListener("focusout", startServicesAutoplay);
-carousel?.addEventListener("touchstart", stopServicesAutoplay, { passive: true });
-carousel?.addEventListener("touchend", startServicesAutoplay);
-
 window.addEventListener("resize", updateServicesCarousel);
 updateServicesCarousel();
-startServicesAutoplay();

@@ -21,7 +21,7 @@
         <a href="#cotacao">Cotação</a>
         <a href="#unidades">Unidades</a>
       </nav>
-      <a class="track-button" href="#rastreamento" aria-label="Rastreamento">
+      <a class="track-button" href="https://ssw.inf.br/2/rastreamento" aria-label="Rastreamento">
         <img src="%C3%8Dcones/Rastreamento%20_%20Header.png" alt="">
       </a>
     </header>
@@ -180,8 +180,8 @@
       <section id="unidades" class="section units">
         <img class="units-map" src="assets/mapa-sul.png" alt="Mapa de atendimento no Sul do Brasil">
         <div class="units-copy">
-          <span class="pill" style="font-weight: 600;">Cobertura que conecta</span>
-          <h2>Onde você precisa, com quem entende</h2>
+          <span class="pill" style="font-weight: 900;">Cobertura que conecta</span>
+          <h2 style="font-weight: 900;">Onde você precisa, com quem entende</h2>
           <p>Atendemos com excelência na distribuição para toda a região Sul do Brasil, com agilidade e eficiência.</p>
           <label>Cidades de entrega<input id="delivery-city" type="search" list="delivery-area-options" placeholder="Digite o nome da cidade"></label>
           <div id="delivery-city-result" class="area-result" aria-live="polite" hidden></div>
@@ -224,17 +224,7 @@
       </section>
 
       <section id="clientes" class="section clients">
-        <div>
-          <h2>Nossos clientes</h2>
-        </div>
-        <div class="clients-copy">
-          <p>Nosso diferencial é amplo atendimento e distribuição de gêneros alimentícios, produtos de higiene, cosméticos, material para escritório, eletrodomésticos entre outros, nas grandes e pequenas redes de supermercados, atacadistas, hipermercados e distribuidores.</p>
-          <div class="metrics">
-            <span><strong>+200</strong>Clientes ativos</span>
-            <span><strong>+500k</strong>Entregas anuais</span>
-            <span><strong>+1k</strong>Cidades atendidas</span>
-          </div>
-        </div>
+        <img class="clients-reference" src="assets/clientes-section.png" alt="Nossos clientes">
       </section>
 
       <section id="cotacao" class="section quote">
@@ -242,27 +232,27 @@
           <span class="pill">Cotação</span>
           <h2>Calcule sua operação</h2>
         </div>
-        <form class="quote-form" data-success-target="cotacao-sucesso">
-          <label style="font-weight: 700;">CNPJ do pagador<input type="text" placeholder="00.000.000/0000-00" required></label>
-          <div class="form-group">
+        <form class="quote-form" data-success-target="cotacao-sucesso" data-mailto="cotacao@karavaggio.com.br">
+          <label style="font-weight: 700;">CNPJ do pagador<input name="cnpj_pagador" type="text" inputmode="numeric" data-document-mask placeholder="00.000.000/0000-00" required></label>
+          <div class="form-group origin-group">
             <h3>Dados de origem</h3>
-            <label style="font-weight: 700;">CNPJ de origem<input type="text" placeholder="00.000.000/0000-00"></label>
-            <label style="font-weight: 700;">Cidade e estado de origem<input id="quote-origin-city" type="text" list="delivery-area-options" placeholder="Digite o nome da cidade"></label>
+            <label style="font-weight: 700;">CNPJ de origem<input name="cnpj_origem" type="text" inputmode="numeric" data-document-mask placeholder="00.000.000/0000-00"></label>
+            <label style="font-weight: 700;">Cidade e estado de origem<input id="quote-origin-city" name="origem" type="text" list="delivery-area-options" placeholder="Digite o nome da cidade"></label>
             <div id="quote-origin-city-result" class="area-result" aria-live="polite" hidden></div>
           </div>
-          <div class="form-group">
+          <div class="form-group destination-group">
             <h3>Dados de destino</h3>
-            <label style="font-weight: 700;">CNPJ de destino<input type="text" placeholder="00.000.000/0000-00"></label>
-            <label style="font-weight: 700;">Cidade e estado de destino<input id="quote-destination-city" type="text" list="delivery-area-options" placeholder="Digite o nome da cidade"></label>
+            <label style="font-weight: 700;">CNPJ de destino<input name="cnpj_destino" type="text" inputmode="numeric" data-document-mask placeholder="00.000.000/0000-00"></label>
+            <label style="font-weight: 700;">Cidade e estado de destino<input id="quote-destination-city" name="destino" type="text" list="delivery-area-options" placeholder="Digite o nome da cidade"></label>
             <div id="quote-destination-city-result" class="area-result" aria-live="polite" hidden></div>
           </div>
           <div class="invoice-group">
             <h3>Dados da nota fiscal</h3>
-            <label style="font-weight: 700;">Valor total da Nota Fiscal<input type="text" placeholder="R$ 000,00"></label>
-            <label style="font-weight: 700;">Quantidade de volumes<input type="number" placeholder="000"></label>
-            <label style="font-weight: 700;">Peso bruto<input type="text" placeholder="000,00 kg"></label>
-            <label class="wide" style="font-weight: 700;">Cubagem da mercadoria<input type="text" placeholder="Gentileza informar as dimensões das caixas ou pallets. Em caso de já obter a cubagem total, informar a cubagem total dos produtos."></label>
-            <label class="wide" style="font-weight: 700;">Observações e comentários<textarea></textarea></label>
+            <label style="font-weight: 700;">Valor total da Nota Fiscal<input name="valor_nota" type="text" inputmode="numeric" data-money-mask placeholder="R$ 000,00"></label>
+            <label style="font-weight: 700;">Quantidade de volumes<input name="volumes" type="text" inputmode="numeric" data-integer-mask placeholder="000"></label>
+            <label style="font-weight: 700;">Peso bruto<input name="peso_bruto" type="text" inputmode="numeric" data-weight-mask placeholder="000,00 kg"></label>
+            <label class="wide" style="font-weight: 700;">Cubagem da mercadoria<input name="cubagem" type="text" placeholder="Gentileza informar as dimensões das caixas ou pallets. Em caso de já obter a cubagem total, informar a cubagem total dos produtos."></label>
+            <label class="wide" style="font-weight: 700;">Observações e comentários<textarea name="observacoes"></textarea></label>
           </div>
           <button type="submit">Enviar</button>
         </form>
