@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
-QUOTE_RECIPIENT = "cotacao@karavaggio.com.br"
+QUOTE_RECIPIENT = "abstrait.audibert@gmail.com"
 # QUOTE_RECIPIENT = "cleber192875@gmail.com"
 
 def load_env_file(env_path: Path, *, override: bool = False) -> None:
