@@ -274,33 +274,106 @@ const track = carousel?.querySelector(".service-cards");
 const cards = Array.from(carousel?.querySelectorAll(".service-card") || []);
 const previousButton = carousel?.querySelector(".carousel-prev");
 const nextButton = carousel?.querySelector(".carousel-next");
-let activeService = 1;
+let activeService = 0;
+let isServiceCarouselMoving = false;
+const serviceCarouselDuration = 420;
 
-function updateServicesCarousel() {
+function getServiceCardScale(card) {
+  return card.classList.contains("is-active") ? 1 : 0.76;
+}
+
+function getServiceCardOpacity(card) {
+  return card.classList.contains("is-active") ? 1 : 0.52;
+}
+
+function getVisibleServiceRects() {
+  return new Map(
+    cards
+      .filter((card) => !card.classList.contains("is-hidden"))
+      .map((card) => [card, {
+        left: card.getBoundingClientRect().left,
+        scale: getServiceCardScale(card),
+        opacity: getServiceCardOpacity(card),
+      }])
+  );
+}
+
+function updateServicesCarousel({ animate = false, direction = 1, previousRects = null } = {}) {
   if (!track || cards.length === 0) return;
 
-  const carouselWidth = carousel.getBoundingClientRect().width;
-  const carouselStyles = getComputedStyle(carousel);
-  const carouselPaddingLeft = parseFloat(carouselStyles.paddingLeft) || 0;
-  const cardWidth = cards[0].getBoundingClientRect().width;
-  const gap = parseFloat(getComputedStyle(track).gap) || 0;
-  const activeCenter = activeService * (cardWidth + gap) + cardWidth / 2;
-  const carouselCenter = carouselWidth / 2;
+  const previousService = (activeService - 1 + cards.length) % cards.length;
+  const nextService = (activeService + 1) % cards.length;
 
-  track.style.transform = `translateX(${carouselCenter - carouselPaddingLeft - activeCenter}px)`;
   cards.forEach((card, index) => {
-    card.classList.toggle("is-active", index === activeService);
+    const isPrevious = index === previousService;
+    const isActive = index === activeService;
+    const isNext = index === nextService;
+
+    card.classList.toggle("is-prev", isPrevious);
+    card.classList.toggle("is-active", isActive);
+    card.classList.toggle("is-next", isNext);
+    card.classList.toggle("is-hidden", !isPrevious && !isActive && !isNext);
+
+    if (isPrevious) card.style.order = "0";
+    if (isActive) card.style.order = "1";
+    if (isNext) card.style.order = "2";
   });
+
+  if (!animate || !previousRects) return;
+
+  const gap = parseFloat(getComputedStyle(track).gap) || 0;
+  const cardWidth = cards.find((card) => !card.classList.contains("is-hidden"))?.getBoundingClientRect().width || 0;
+  const entryOffset = direction * (cardWidth + gap);
+
+  cards
+    .filter((card) => !card.classList.contains("is-hidden"))
+    .forEach((card) => {
+      const targetRect = card.getBoundingClientRect();
+      const targetScale = getServiceCardScale(card);
+      const targetOpacity = getServiceCardOpacity(card);
+      const previousRect = previousRects.get(card);
+      const startX = previousRect ? previousRect.left - targetRect.left : entryOffset;
+      const startScale = previousRect ? previousRect.scale : targetScale;
+      const startOpacity = previousRect ? previousRect.opacity : 0;
+
+      card.animate(
+        [
+          {
+            opacity: startOpacity,
+            transform: `translateX(${startX}px) scale(${startScale})`,
+          },
+          {
+            opacity: targetOpacity,
+            transform: `translateX(0) scale(${targetScale})`,
+          },
+        ],
+        {
+          duration: serviceCarouselDuration,
+          easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+        }
+      );
+    });
+}
+
+function moveServicesCarousel(direction) {
+  if (isServiceCarouselMoving || cards.length === 0) return;
+
+  isServiceCarouselMoving = true;
+  const previousRects = getVisibleServiceRects();
+  activeService = (activeService + direction + cards.length) % cards.length;
+  updateServicesCarousel({ animate: true, direction, previousRects });
+
+  window.setTimeout(() => {
+    isServiceCarouselMoving = false;
+  }, serviceCarouselDuration);
 }
 
 function showPreviousService() {
-  activeService = (activeService - 1 + cards.length) % cards.length;
-  updateServicesCarousel();
+  moveServicesCarousel(-1);
 }
 
 function showNextService() {
-  activeService = (activeService + 1) % cards.length;
-  updateServicesCarousel();
+  moveServicesCarousel(1);
 }
 
 previousButton?.addEventListener("click", showPreviousService);

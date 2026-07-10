@@ -98,8 +98,8 @@ def build_quote_body(quote: QuoteRequest) -> str:
 
 
 def send_email(subject: str, body: str) -> None:
-    smtp_user = os.getenv("EMAIL_USER")
-    smtp_password = os.getenv("EMAIL_PASSWORD")
+    smtp_user = os.getenv("EMAIL_USER_Cota")
+    smtp_password = os.getenv("EMAIL_PASSWORD_Cota")
 
     if not smtp_user or not smtp_password:
         raise HTTPException(

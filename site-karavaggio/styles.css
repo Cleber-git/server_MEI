@@ -159,7 +159,9 @@ a {
   gap: 28px;
   min-height: 128px;
   padding: 24px var(--page-x);
-  background: rgba(238, 238, 238, 0.94);
+  background: #066e39;
+  color: var(--white);
+  border-radius: 0 0 24px 24px;
   backdrop-filter: blur(8px);
 }
 
@@ -177,7 +179,7 @@ a {
 
 .main-menu a:hover,
 .main-menu a:focus-visible {
-  color: var(--green-2);
+  color: var(--white);
 }
 
 .track-button,
@@ -460,30 +462,45 @@ p {
 .service-cards {
   display: flex;
   align-items: center;
-  gap: 14px;
-  transition: transform 360ms ease;
-  will-change: transform;
+  gap: 0;
 }
 
 .service-card {
-  flex: 0 0 calc((100% - 28px) / 3);
+  flex: 0 0 calc(100% / 3);
+  z-index: 0;
   min-height: 430px;
   padding: 30px 24px 32px;
   border-radius: 24px;
   background: var(--green-soft);
   color: rgba(255, 255, 255, 0.88);
   box-shadow: var(--shadow);
-  opacity: 0.88;
-  transform: none;
-  transition: transform 260ms ease, opacity 260ms ease, background 260ms ease;
+  opacity: 0.52;
+  transform: scale(0.76);
+  transition:
+    transform 360ms ease,
+    opacity 260ms ease,
+    background 260ms ease,
+    color 260ms ease;
+  will-change: transform, opacity;
+}
+
+.service-card.is-prev,
+.service-card.is-next {
+  z-index: 1;
+  opacity: 0.52;
+  transform: scale(0.76);
+}
+
+.service-card.is-hidden {
+  display: none;
 }
 
 .service-card.is-active {
-  min-height: 430px;
+  z-index: 2;
   background: var(--green);
   color: var(--white);
   opacity: 1;
-  transform: none;
+  transform: scale(1);
 }
 
 .service-card h3 {
@@ -1213,8 +1230,9 @@ form button {
     transform: scale(1);
   }
 
-  .service-card:not(.is-active) {
-    opacity: 0.2;
+  .service-card.is-prev,
+  .service-card.is-next {
+    display: none;
   }
 
   .carousel-button {
