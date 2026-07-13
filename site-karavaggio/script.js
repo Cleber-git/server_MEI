@@ -175,7 +175,11 @@ async function sendQuoteEmail(form) {
 const deliveryAreas = Array.isArray(window.KARAVAGGIO_DELIVERY_AREAS)
   ? window.KARAVAGGIO_DELIVERY_AREAS
   : [];
+const pickupAreas = Array.isArray(window.KARAVAGGIO_PICKUP_AREAS)
+  ? window.KARAVAGGIO_PICKUP_AREAS
+  : [];
 const deliveryOptions = document.getElementById("delivery-area-options");
+const pickupOptions = document.getElementById("pickup-area-options");
 
 function normalizeSearchText(value) {
   return value
@@ -189,11 +193,11 @@ function getAreaLabel(area) {
   return `${area.city} - ${area.uf}`;
 }
 
-function findDeliveryArea(value) {
+function findArea(value, areas) {
   const search = normalizeSearchText(value.replace(/\s+-\s+[A-Z]{2}$/i, ""));
   const selectedUf = value.match(/\s+-\s+([A-Z]{2})$/i)?.[1]?.toUpperCase();
 
-  return deliveryAreas.find((area) => {
+  return areas.find((area) => {
     const sameCity = normalizeSearchText(area.city) === search;
     const sameUf = !selectedUf || area.uf === selectedUf;
     return sameCity && sameUf;
@@ -243,20 +247,22 @@ function renderAreaResult(target, area, typedValue, options = {}) {
   target.hidden = false;
 }
 
-function bindAreaLookup(inputId, resultId, options = {}) {
+function bindAreaLookup(inputId, resultId, options = {}, areas = deliveryAreas) {
   const input = document.getElementById(inputId);
   const result = document.getElementById(resultId);
   if (!input || !result) return;
 
-  const updateResult = () => renderAreaResult(result, findDeliveryArea(input.value), input.value, options);
+  const updateResult = () => renderAreaResult(result, findArea(input.value, areas), input.value, options);
 
   input.addEventListener("input", updateResult);
   input.addEventListener("change", updateResult);
 }
 
-if (deliveryOptions && deliveryAreas.length) {
-  deliveryOptions.replaceChildren(
-    ...deliveryAreas.map((area) => {
+function populateAreaOptions(target, areas) {
+  if (!target || !areas.length) return;
+
+  target.replaceChildren(
+    ...areas.map((area) => {
       const option = document.createElement("option");
       option.value = getAreaLabel(area);
       return option;
@@ -264,9 +270,12 @@ if (deliveryOptions && deliveryAreas.length) {
   );
 }
 
+populateAreaOptions(deliveryOptions, deliveryAreas);
+populateAreaOptions(pickupOptions, pickupAreas);
+
 bindAreaLookup("delivery-city", "delivery-city-result", { showPraca: false });
-bindAreaLookup("pickup-city", "pickup-city-result", { showPraca: false, showPrazo: false });
-bindAreaLookup("quote-origin-city", "quote-origin-city-result", { showDetails: false });
+bindAreaLookup("pickup-city", "pickup-city-result", { showPraca: false, showPrazo: false }, pickupAreas);
+bindAreaLookup("quote-origin-city", "quote-origin-city-result", { showDetails: false }, pickupAreas);
 bindAreaLookup("quote-destination-city", "quote-destination-city-result", { showPraca: false });
 
 const carousel = document.querySelector(".services-carousel");
