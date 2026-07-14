@@ -358,13 +358,13 @@ p {
 }
 
 .history-copy {
-  padding-top: 0;
+  padding-top: 26px;
 }
 
 .history-copy .pill {
   border-radius: 9px;
   padding: 8px 14px 7px;
-  background: var(--green-2);
+  background: #c59a43;
   font-family: var(--font-display);
   font-size: clamp(32px, 3vw, 44px);
   line-height: 1;
@@ -375,7 +375,7 @@ p {
   max-width: 610px;
   margin: 18px 0 0;
   color: var(--green);
-  font-size: clamp(19px, 1.6vw, 24px);
+  font-size: clamp(20px, 1.68vw, 25.5px);
   font-weight: 500;
   line-height: 1.26;
 }
@@ -422,11 +422,21 @@ p {
 
 .about-copy p {
   max-width: 640px;
-  margin: 18px 0 0;
+  margin: 18px auto 0;
   color: var(--about-text-green);
   font-size: clamp(18px, 1.35vw, 22px);
   font-weight: 500;
   line-height: 1.32;
+  text-align: center;
+}
+
+.about-copy > p:first-of-type {
+  max-width: none;
+  font-size: clamp(20px, 1.6vw, 24px);
+  margin-top: 30px;
+  margin-left: 0;
+  margin-right: auto;
+  text-align: left;
 }
 
 .about-copy .about-callout {
@@ -436,6 +446,7 @@ p {
 
 .about .title-line h2 {
   color: var(--about-text-green);
+  font-size: clamp(38px, 4.4vw, 54px);
   font-weight: 800;
 }
 
@@ -460,19 +471,19 @@ p {
 }
 
 .feature-list img {
-  width: clamp(88px, 7vw, 112px);
+  width: clamp(112px, 9vw, 144px);
   height: auto;
   aspect-ratio: 1;
   object-fit: contain;
 }
 
 .feature-list li:last-child img {
-  width: clamp(132px, 10.5vw, 168px);
+  width: clamp(168px, 13.5vw, 216px);
   aspect-ratio: 1.5 / 1;
 }
 
 .feature-list strong {
-  color: var(--about-text-green);
+  color: var(--gold);
   font-size: clamp(18px, 1.35vw, 22px);
   font-weight: 900;
   line-height: 1.1;
@@ -702,7 +713,8 @@ form button {
   min-height: 196px;
 }
 
-.contact .form-card button {
+.contact .form-card button,
+.quote-form > button {
   min-width: 178px;
   padding-block: 12px;
   font-size: 26px;
@@ -1010,6 +1022,7 @@ form button {
   gap: clamp(72px, 8vw, 150px);
   width: min(1620px, 100%);
   margin-top: clamp(42px, 6vh, 64px);
+  transform: translateX(-60px);
   color: var(--green);
   font-size: clamp(21px, 1.5vw, 26px);
   font-weight: 500;
@@ -1018,7 +1031,7 @@ form button {
 
 .success-notes > span {
   display: grid;
-  grid-template-columns: clamp(120px, 9vw, 160px) 1fr;
+  grid-template-columns: clamp(120px, 16svh, 150px) 1fr;
   align-items: center;
   gap: clamp(14px, 1.2vw, 22px);
   text-align: center;
@@ -1033,6 +1046,7 @@ form button {
   content: "";
   display: block;
   width: clamp(120px, 16svh, 150px);
+  height: clamp(120px, 16svh, 150px);
   aspect-ratio: 1;
   border-radius: 50%;
   background: center / cover no-repeat;
@@ -1044,6 +1058,7 @@ form button {
 
 .success-notes > span:last-child::before {
   background-image: url("certoverde.png");
+  background-size: 116%;
 }
 
 .success-notes img {
@@ -1304,6 +1319,7 @@ form button {
     width: min(620px, 100%);
     margin-top: 42px;
     font-size: clamp(18px, 2.5vw, 22px);
+    transform: none;
   }
 
   .success-notes > span {
