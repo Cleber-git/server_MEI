@@ -1225,7 +1225,7 @@ form button {
   }
 
   .main-menu.is-open {
-    display: grid;
+    display: grid !important;
     width: 100%;
     justify-content: stretch;
     gap: 12px;
