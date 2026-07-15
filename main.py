@@ -36,6 +36,7 @@ app = FastAPI()
 KARAVAGGIO_DEMO_PREFIX = os.getenv("KARAVAGGIO_DEMO_PREFIX", "apresentacao").strip("/") or "apresentacao"
 KARAVAGGIO_DEMO_TOKEN = os.getenv("KARAVAGGIO_DEMO_TOKEN", "karavaggio-preview-2026").strip("/") or "karavaggio-preview-2026"
 KARAVAGGIO_SITE_DIR = (Path(__file__).resolve().parent / "site-karavaggio").resolve()
+KARAVAGGIO_CACHE_HEADERS = {"Cache-Control": "no-cache, must-revalidate"}
 
 
 def get_empresa(validation_uuid: str = Header(alias="validation-uuid")):
@@ -143,13 +144,13 @@ def abrir_site_karavaggio(access_key: str):
 @app.get(f"/{KARAVAGGIO_DEMO_PREFIX}/{{access_key}}/", include_in_schema=False)
 def site_karavaggio(access_key: str):
     validar_acesso_karavaggio(access_key)
-    return FileResponse(arquivo_karavaggio())
+    return FileResponse(arquivo_karavaggio(), headers=KARAVAGGIO_CACHE_HEADERS)
 
 
 @app.get(f"/{KARAVAGGIO_DEMO_PREFIX}/{{access_key}}/{{caminho:path}}", include_in_schema=False)
 def site_karavaggio_assets(access_key: str, caminho: str):
     validar_acesso_karavaggio(access_key)
-    return FileResponse(arquivo_karavaggio(caminho))
+    return FileResponse(arquivo_karavaggio(caminho), headers=KARAVAGGIO_CACHE_HEADERS)
 
 def create_tables():
     try:
