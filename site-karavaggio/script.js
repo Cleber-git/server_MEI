@@ -276,7 +276,7 @@ populateAreaOptions(pickupOptions, pickupAreas);
 bindAreaLookup("delivery-city", "delivery-city-result", { showPraca: false });
 bindAreaLookup("pickup-city", "pickup-city-result", { showPraca: false, showPrazo: false }, pickupAreas);
 bindAreaLookup("quote-origin-city", "quote-origin-city-result", { showDetails: false }, pickupAreas);
-bindAreaLookup("quote-destination-city", "quote-destination-city-result", { showPraca: false });
+bindAreaLookup("quote-destination-city", "quote-destination-city-result", { showDetails: false }, pickupAreas);
 
 const carousel = document.querySelector(".services-carousel");
 const track = carousel?.querySelector(".service-cards");
