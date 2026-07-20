@@ -12,8 +12,7 @@ from pydantic import BaseModel, Field
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
-QUOTE_RECIPIENT = "abstrait.audibert@gmail.com"
-# QUOTE_RECIPIENT = "cleber192875@gmail.com"
+QUOTE_EMAIL = "cotacao@karavaggio.com.br"
 
 def load_env_file(env_path: Path, *, override: bool = False) -> None:
     if not env_path.exists():
@@ -33,7 +32,6 @@ def load_env_file(env_path: Path, *, override: bool = False) -> None:
             os.environ.setdefault(key, value)
 
 
-load_env_file(ROOT_DIR.parent / ".env")
 load_env_file(ROOT_DIR / ".env", override=True)
 
 
@@ -55,6 +53,8 @@ app = FastAPI(title="Karavaggio Site API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "https://karavaggio.com.br",
+        "https://www.karavaggio.com.br",
         "http://localhost:8000",
         "http://127.0.0.1:8000",
         "null",
@@ -109,8 +109,8 @@ def send_email(subject: str, body: str) -> None:
 
     message = EmailMessage()
     message["Subject"] = subject
-    message["From"] = smtp_user
-    message["To"] = QUOTE_RECIPIENT
+    message["From"] = QUOTE_EMAIL
+    message["To"] = QUOTE_EMAIL
     message.set_content(body)
 
     try:

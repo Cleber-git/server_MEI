@@ -135,16 +135,14 @@ function getFieldValue(form, name) {
 }
 
 function getQuoteApiUrl() {
-  if (window.location.protocol === "file:") {
-    return "http://127.0.0.1:8000/api/cotacao";
+  const apiUrl = window.KARAVAGGIO_CONFIG?.quoteApiUrl?.trim();
+  if (!apiUrl) {
+    throw new Error("Serviço de cotação não configurado.");
   }
-
-  return "/api/cotacao";
+  return apiUrl;
 }
 
 async function sendQuoteEmail(form) {
-  if (!form.dataset.mailto) return;
-
   const payload = {
     cnpj_pagador: getFieldValue(form, "cnpj_pagador"),
     cnpj_origem: getFieldValue(form, "cnpj_origem"),
