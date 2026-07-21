@@ -105,7 +105,11 @@ document.querySelectorAll("form[data-success-target]").forEach((form) => {
     event.preventDefault();
 
     try {
-      await sendQuoteEmail(form);
+      if (form.dataset.emailFlow === "sac") {
+        await sendSacEmail(form);
+      } else {
+        await sendQuoteEmail(form);
+      }
     } catch (error) {
       alert(error.message || "Não foi possível enviar a solicitação. Tente novamente.");
       return;
@@ -140,6 +144,29 @@ function getQuoteApiUrl() {
     throw new Error("Serviço de cotação não configurado.");
   }
   return apiUrl;
+}
+
+function getSacApiUrl() {
+  const apiUrl = window.KARAVAGGIO_CONFIG?.sacApiUrl?.trim();
+  if (!apiUrl) throw new Error("Serviço do SAC não configurado.");
+  return apiUrl;
+}
+
+async function sendSacEmail(form) {
+  const payload = {
+    nome: getFieldValue(form, "nome"),
+    email: getFieldValue(form, "email"),
+    mensagem: getFieldValue(form, "mensagem"),
+  };
+  const response = await fetch(getSacApiUrl(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.detail || "Falha ao enviar mensagem ao SAC.");
+  }
 }
 
 async function sendQuoteEmail(form) {
