@@ -2475,6 +2475,18 @@ def finance_trip_create(data: FinanceViagemIn, user_id: int = Depends(get_financ
     finally: put_conn(conn)
 
 
+@app.delete("/api/financeiro/viagens/{trip_id}")
+def finance_trip_delete(trip_id: int, user_id: int = Depends(get_finance_user)):
+    conn=get_conn()
+    try:
+        cur=conn.cursor()
+        cur.execute("DELETE FROM financeiro_viagem WHERE id=%s AND usuario_id=%s", (trip_id,user_id))
+        deleted=cur.rowcount > 0; conn.commit()
+        if not deleted: raise HTTPException(status_code=404,detail="Planejamento nao encontrado")
+        return {"sucesso":True}
+    finally: put_conn(conn)
+
+
 @app.post("/api/financeiro/viagens/{trip_id}/gastos")
 def finance_trip_expense(trip_id: int, data: FinanceViagemGastoIn, user_id: int = Depends(get_finance_user)):
     conn=get_conn()
@@ -2513,6 +2525,18 @@ def finance_reserve_create(data: FinanceReservaIn, user_id: int = Depends(get_fi
                        VALUES (%s,%s,%s,%s,%s,%s) RETURNING id""",
                     (user_id,data.nome,data.tipo,data.meta,data.prazo or None,data.observacao))
         new_id=cur.fetchone()[0]; conn.commit(); return {"id":new_id,"sucesso":True}
+    finally: put_conn(conn)
+
+
+@app.delete("/api/financeiro/reservas/{reserve_id}")
+def finance_reserve_delete(reserve_id: int, user_id: int = Depends(get_finance_user)):
+    conn=get_conn()
+    try:
+        cur=conn.cursor()
+        cur.execute("DELETE FROM financeiro_reserva WHERE id=%s AND usuario_id=%s", (reserve_id,user_id))
+        deleted=cur.rowcount > 0; conn.commit()
+        if not deleted: raise HTTPException(status_code=404,detail="Reserva nao encontrada")
+        return {"sucesso":True}
     finally: put_conn(conn)
 
 
