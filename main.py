@@ -668,12 +668,15 @@ def create_finance_tables():
             CREATE TABLE IF NOT EXISTS financeiro_reserva_aporte (
                 id BIGSERIAL PRIMARY KEY,
                 reserva_id BIGINT NOT NULL REFERENCES financeiro_reserva(id) ON DELETE CASCADE,
+                lancamento_id BIGINT REFERENCES financeiro_lancamento(id) ON DELETE SET NULL,
                 valor NUMERIC(14,2) NOT NULL CHECK (valor > 0),
                 data DATE NOT NULL,
                 observacao TEXT,
                 criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )
         """)
+        cur.execute("""ALTER TABLE financeiro_reserva_aporte
+                       ADD COLUMN IF NOT EXISTS lancamento_id BIGINT REFERENCES financeiro_lancamento(id) ON DELETE SET NULL""")
         cur.execute("""
             INSERT INTO financeiro_usuario (login, senha_hash, nome)
             VALUES (%s, %s, %s)
@@ -2533,8 +2536,15 @@ def finance_reserve_delete(reserve_id: int, user_id: int = Depends(get_finance_u
     conn=get_conn()
     try:
         cur=conn.cursor()
+        cur.execute("""SELECT a.lancamento_id FROM financeiro_reserva_aporte a
+                       JOIN financeiro_reserva r ON r.id=a.reserva_id
+                       WHERE r.id=%s AND r.usuario_id=%s AND a.lancamento_id IS NOT NULL""", (reserve_id,user_id))
+        linked_entries=[row[0] for row in cur.fetchall()]
         cur.execute("DELETE FROM financeiro_reserva WHERE id=%s AND usuario_id=%s", (reserve_id,user_id))
-        deleted=cur.rowcount > 0; conn.commit()
+        deleted=cur.rowcount > 0
+        if linked_entries:
+            cur.execute("DELETE FROM financeiro_lancamento WHERE usuario_id=%s AND id = ANY(%s)", (user_id,linked_entries))
+        conn.commit()
         if not deleted: raise HTTPException(status_code=404,detail="Reserva nao encontrada")
         return {"sucesso":True}
     finally: put_conn(conn)
@@ -2545,11 +2555,17 @@ def finance_reserve_deposit(reserve_id: int, data: FinanceAporteIn, user_id: int
     conn = get_conn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT 1 FROM financeiro_reserva WHERE id=%s AND usuario_id=%s", (reserve_id,user_id))
-        if not cur.fetchone(): raise HTTPException(status_code=404,detail="Reserva nao encontrada")
-        cur.execute("""INSERT INTO financeiro_reserva_aporte (reserva_id,valor,data,observacao)
-                       VALUES (%s,%s,%s,%s) RETURNING id""",
-                    (reserve_id,data.valor,data.data,data.observacao))
+        cur.execute("SELECT nome,tipo FROM financeiro_reserva WHERE id=%s AND usuario_id=%s", (reserve_id,user_id))
+        reserve=cur.fetchone()
+        if not reserve: raise HTTPException(status_code=404,detail="Reserva nao encontrada")
+        cur.execute("""INSERT INTO financeiro_lancamento
+            (usuario_id,descricao,valor,natureza,modalidade,categoria,data_vencimento,status,recorrente,observacao)
+            VALUES (%s,%s,%s,'despesa','planejamento','Reservas',%s,'pago',FALSE,%s) RETURNING id""",
+            (user_id,"Aporte — "+reserve[0],data.valor,data.data,data.observacao))
+        entry_id=cur.fetchone()[0]
+        cur.execute("""INSERT INTO financeiro_reserva_aporte (reserva_id,lancamento_id,valor,data,observacao)
+                       VALUES (%s,%s,%s,%s,%s) RETURNING id""",
+                    (reserve_id,entry_id,data.valor,data.data,data.observacao))
         new_id=cur.fetchone()[0]; conn.commit(); return {"id":new_id,"sucesso":True}
     finally: put_conn(conn)
 
