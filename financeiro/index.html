@@ -4,65 +4,72 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#f4f1ea">
-  <title>Clari — Gestão financeira</title>
+  <title>cleeFinanças — Gestão financeira</title>
   <link rel="stylesheet" href="/financeiro/assets/styles.css">
 </head>
 <body>
   <section id="login" class="login-page">
-    <div class="login-brand"><span class="brand-mark">C</span><span>clari</span></div>
+    <div class="login-brand"><span class="brand-mark">cF</span><span>clee<b>Finanças</b></span></div>
     <div class="login-copy"><span class="eyebrow">SUAS FINANÇAS, MAIS LEVES</span><h1>Clareza para decidir.<br><em>Calma para viver.</em></h1><p>Organize gastos, acompanhe planos e transforme números em escolhas melhores.</p></div>
     <form id="loginForm" class="login-card">
       <div><span class="eyebrow">BEM-VINDO DE VOLTA</span><h2>Acesse sua conta</h2></div>
       <label>Usuário<input name="login" autocomplete="username" required placeholder="Seu usuário"></label>
       <label>Senha<input name="senha" type="password" autocomplete="current-password" required placeholder="Sua senha"></label>
       <p id="loginError" class="error"></p>
-      <button class="primary wide">Entrar <span>→</span></button>
+      <button class="primary wide">Entrar <i data-lucide="arrow-right"></i></button>
       <small>Seus dados financeiros são privados e protegidos.</small>
     </form>
   </section>
 
   <div id="app" class="app hidden">
     <aside class="sidebar">
-      <div class="brand"><span class="brand-mark">C</span><span>clari</span></div>
+      <div class="brand"><span class="brand-mark">cF</span><span>clee<b>Finanças</b></span></div>
       <nav>
-        <button data-view="dashboard" class="nav active"><span>⌂</span>Visão geral</button>
-        <button data-view="lancamentos" class="nav"><span>↕</span>Lançamentos</button>
-        <button data-view="viagens" class="nav"><span>◇</span>Viagens & planos</button>
-        <button data-view="relatorios" class="nav"><span>▤</span>Relatórios</button>
+        <button data-view="dashboard" class="nav active"><i data-lucide="layout-dashboard"></i>Visão geral</button>
+        <button data-view="lancamentos" class="nav"><i data-lucide="arrow-right-left"></i>Lançamentos</button>
+        <button data-view="viagens" class="nav"><i data-lucide="target"></i>Planejamentos</button>
+        <button data-view="relatorios" class="nav"><i data-lucide="file-chart-column"></i>Relatórios</button>
       </nav>
-      <div class="sidebar-foot"><div class="avatar">CL</div><div><b>Clee</b><small>Conta pessoal</small></div><button id="logout" title="Sair">↗</button></div>
+      <div class="sidebar-foot"><div class="avatar">CL</div><div><b>Clee</b><small>Conta pessoal</small></div><button id="logout" title="Sair"><i data-lucide="log-out"></i></button></div>
     </aside>
 
     <main>
-      <header><div><p id="today"></p><h1 id="pageTitle">Visão geral</h1></div><button class="primary" data-open="transaction">＋ Novo lançamento</button></header>
+      <header><div><p id="today"></p><h1 id="pageTitle">Visão geral</h1></div><button class="primary icon-button" data-open="transaction"><i data-lucide="plus"></i>Novo lançamento</button></header>
 
       <section id="dashboard" class="view active-view">
         <div class="hero-card"><div><span class="muted">SALDO ATUAL</span><h2 id="balance">R$ 0,00</h2><p id="balanceHint">Carregando seu resumo...</p></div><div class="hero-art"><i></i><i></i><i></i></div></div>
         <div class="metrics">
-          <article><span class="metric-icon income">↓</span><div><small>RECEITAS</small><b id="income">R$ 0,00</b></div></article>
-          <article><span class="metric-icon expense">↑</span><div><small>DESPESAS PAGAS</small><b id="expense">R$ 0,00</b></div></article>
-          <article><span class="metric-icon pending">○</span><div><small>A PAGAR</small><b id="pending">R$ 0,00</b></div></article>
-          <article><span class="metric-icon fixed">↻</span><div><small>GASTOS FIXOS</small><b id="fixed">R$ 0,00</b></div></article>
+          <article><span class="metric-icon income"><i data-lucide="trending-up"></i></span><div><small>RECEITAS</small><b id="income">R$ 0,00</b></div></article>
+          <article><span class="metric-icon expense"><i data-lucide="trending-down"></i></span><div><small>DESPESAS PAGAS</small><b id="expense">R$ 0,00</b></div></article>
+          <article><span class="metric-icon pending"><i data-lucide="clock-3"></i></span><div><small>A PAGAR</small><b id="pending">R$ 0,00</b></div></article>
+          <article><span class="metric-icon fixed"><i data-lucide="repeat-2"></i></span><div><small>GASTOS FIXOS</small><b id="fixed">R$ 0,00</b></div></article>
         </div>
         <div class="dashboard-grid">
           <article class="panel chart-panel"><div class="panel-head"><div><small>FLUXO FINANCEIRO</small><h3>Receitas x despesas</h3></div><span>Últimos 6 meses</span></div><div id="flowChart" class="flow-chart"></div><div class="legend"><span><i class="dot green"></i>Receitas</span><span><i class="dot coral"></i>Despesas</span></div></article>
           <article class="panel"><div class="panel-head"><div><small>POR CATEGORIA</small><h3>Para onde vai seu dinheiro</h3></div></div><div id="categoryList" class="category-list empty">Nenhum gasto cadastrado</div></article>
         </div>
-        <article class="panel recent"><div class="panel-head"><div><small>MOVIMENTAÇÕES</small><h3>Últimos lançamentos</h3></div><button class="text-btn" data-go="lancamentos">Ver todos →</button></div><div id="recentList"></div></article>
+        <article class="panel recent"><div class="panel-head"><div><small>MOVIMENTAÇÕES</small><h3>Últimos lançamentos</h3></div><button class="text-btn" data-go="lancamentos">Ver todos <i data-lucide="arrow-right"></i></button></div><div id="recentList"></div></article>
       </section>
 
       <section id="lancamentos" class="view"><div class="section-tools"><div class="segmented"><button class="active" data-filter="todos">Todos</button><button data-filter="despesa">Despesas</button><button data-filter="receita">Receitas</button><button data-filter="pendente">Pendentes</button></div></div><article class="panel"><div id="transactionList" class="table-list"></div></article></section>
 
-      <section id="viagens" class="view"><div class="section-intro"><div><span class="eyebrow">SONHOS COM PLANEJAMENTO</span><h2>Viagens & programações</h2><p>Defina um orçamento e acompanhe cada gasto do seu próximo plano.</p></div><button class="secondary" data-open="trip">＋ Criar planejamento</button></div><div id="tripList" class="trip-grid"></div></section>
+      <section id="viagens" class="view">
+        <div class="section-intro"><div><span class="eyebrow">PLANOS COM PROPÓSITO</span><h2>Planejamentos</h2><p>Prepare viagens e construa reservas para emergências ou garantias.</p></div><div class="planning-actions"><button class="secondary icon-button" data-open="reserve"><i data-lucide="shield-plus"></i>Nova reserva</button><button class="primary icon-button" data-open="trip"><i data-lucide="plus"></i>Planejar viagem</button></div></div>
+        <div class="subsection-head"><div><span class="eyebrow">SEGURANÇA FINANCEIRA</span><h3>Minhas reservas</h3></div><span>Dinheiro guardado para proteger seus planos</span></div>
+        <div id="reserveList" class="reserve-grid"></div>
+        <div class="subsection-head trips-title"><div><span class="eyebrow">VIAGENS & PROGRAMAÇÕES</span><h3>Próximos planos</h3></div></div>
+        <div id="tripList" class="trip-grid"></div>
+      </section>
 
-      <section id="relatorios" class="view"><div class="report-card"><span class="report-icon">▤</span><span class="eyebrow">RELATÓRIO FINANCEIRO</span><h2>Seu panorama, pronto para compartilhar.</h2><p>Gere um documento com saldo, receitas, despesas, categorias e todos os lançamentos cadastrados.</p><button id="downloadPdf" class="primary">Gerar relatório em PDF</button><small>No Safari, escolha “Salvar em Arquivos” na tela de impressão.</small></div><div id="printReport"></div></section>
+      <section id="relatorios" class="view"><div class="report-card"><span class="report-icon"><i data-lucide="file-down"></i></span><span class="eyebrow">RELATÓRIO FINANCEIRO</span><h2>Seu panorama, pronto para compartilhar.</h2><p>Gere um documento com saldo, receitas, despesas, categorias e todos os lançamentos cadastrados.</p><button id="downloadPdf" class="primary icon-button"><i data-lucide="download"></i>Gerar relatório em PDF</button><small>No Safari, escolha “Salvar em Arquivos” na tela de impressão.</small></div><div id="printReport"></div></section>
     </main>
 
-    <nav class="bottom-nav"><button data-view="dashboard" class="nav active"><span>⌂</span>Início</button><button data-view="lancamentos" class="nav"><span>↕</span>Lançamentos</button><button class="add-fab" data-open="transaction">＋</button><button data-view="viagens" class="nav"><span>◇</span>Planos</button><button data-view="relatorios" class="nav"><span>▤</span>Relatório</button></nav>
+    <nav class="bottom-nav"><button data-view="dashboard" class="nav active"><i data-lucide="house"></i>Início</button><button data-view="lancamentos" class="nav"><i data-lucide="arrow-right-left"></i>Lançamentos</button><button class="add-fab" data-open="transaction" aria-label="Novo lançamento"><i data-lucide="plus"></i></button><button data-view="viagens" class="nav"><i data-lucide="target"></i>Planos</button><button data-view="relatorios" class="nav"><i data-lucide="file-chart-column"></i>Relatório</button></nav>
   </div>
 
   <dialog id="modal"><form id="modalForm" method="dialog"><div class="modal-head"><div><span id="modalEyebrow" class="eyebrow"></span><h2 id="modalTitle"></h2></div><button type="button" id="closeModal">×</button></div><div id="modalFields" class="form-grid"></div><p id="formError" class="error"></p><button class="primary wide" id="saveModal">Salvar</button></form></dialog>
   <div id="toast" class="toast"></div>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <script src="/financeiro/assets/app.js"></script>
 </body>
 </html>

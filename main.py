@@ -653,6 +653,28 @@ def create_finance_tables():
             )
         """)
         cur.execute("""
+            CREATE TABLE IF NOT EXISTS financeiro_reserva (
+                id BIGSERIAL PRIMARY KEY,
+                usuario_id BIGINT NOT NULL REFERENCES financeiro_usuario(id) ON DELETE CASCADE,
+                nome VARCHAR(160) NOT NULL,
+                tipo VARCHAR(30) NOT NULL DEFAULT 'emergencia',
+                meta NUMERIC(14,2) NOT NULL CHECK (meta > 0),
+                prazo DATE,
+                observacao TEXT,
+                criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS financeiro_reserva_aporte (
+                id BIGSERIAL PRIMARY KEY,
+                reserva_id BIGINT NOT NULL REFERENCES financeiro_reserva(id) ON DELETE CASCADE,
+                valor NUMERIC(14,2) NOT NULL CHECK (valor > 0),
+                data DATE NOT NULL,
+                observacao TEXT,
+                criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        """)
+        cur.execute("""
             INSERT INTO financeiro_usuario (login, senha_hash, nome)
             VALUES (%s, %s, %s)
             ON CONFLICT (login) DO UPDATE SET senha_hash = EXCLUDED.senha_hash, ativo = TRUE
@@ -2461,6 +2483,49 @@ def finance_trip_expense(trip_id: int, data: FinanceViagemGastoIn, user_id: int 
         if not cur.fetchone(): raise HTTPException(status_code=404,detail="Viagem nao encontrada")
         cur.execute("INSERT INTO financeiro_viagem_gasto (viagem_id,descricao,categoria,valor,data) VALUES (%s,%s,%s,%s,%s) RETURNING id",
                     (trip_id,data.descricao,data.categoria,data.valor,data.data))
+        new_id=cur.fetchone()[0]; conn.commit(); return {"id":new_id,"sucesso":True}
+    finally: put_conn(conn)
+
+
+@app.get("/api/financeiro/reservas")
+def finance_reserves(user_id: int = Depends(get_finance_user)):
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT r.id,r.nome,r.tipo,r.meta,r.prazo,r.observacao,COALESCE(SUM(a.valor),0)
+            FROM financeiro_reserva r
+            LEFT JOIN financeiro_reserva_aporte a ON a.reserva_id=r.id
+            WHERE r.usuario_id=%s GROUP BY r.id ORDER BY r.criado_em DESC
+        """, (user_id,))
+        return [{"id":r[0],"nome":r[1],"tipo":r[2],"meta":float(r[3]),
+                 "prazo":r[4].isoformat() if r[4] else None,"observacao":r[5],"guardado":float(r[6])}
+                for r in cur.fetchall()]
+    finally: put_conn(conn)
+
+
+@app.post("/api/financeiro/reservas")
+def finance_reserve_create(data: FinanceReservaIn, user_id: int = Depends(get_finance_user)):
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""INSERT INTO financeiro_reserva (usuario_id,nome,tipo,meta,prazo,observacao)
+                       VALUES (%s,%s,%s,%s,%s,%s) RETURNING id""",
+                    (user_id,data.nome,data.tipo,data.meta,data.prazo or None,data.observacao))
+        new_id=cur.fetchone()[0]; conn.commit(); return {"id":new_id,"sucesso":True}
+    finally: put_conn(conn)
+
+
+@app.post("/api/financeiro/reservas/{reserve_id}/aportes")
+def finance_reserve_deposit(reserve_id: int, data: FinanceAporteIn, user_id: int = Depends(get_finance_user)):
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT 1 FROM financeiro_reserva WHERE id=%s AND usuario_id=%s", (reserve_id,user_id))
+        if not cur.fetchone(): raise HTTPException(status_code=404,detail="Reserva nao encontrada")
+        cur.execute("""INSERT INTO financeiro_reserva_aporte (reserva_id,valor,data,observacao)
+                       VALUES (%s,%s,%s,%s) RETURNING id""",
+                    (reserve_id,data.valor,data.data,data.observacao))
         new_id=cur.fetchone()[0]; conn.commit(); return {"id":new_id,"sucesso":True}
     finally: put_conn(conn)
 

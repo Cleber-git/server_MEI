@@ -179,6 +179,20 @@ class FinanceViagemGastoIn(BaseModel):
     categoria: str = "Outros"
     valor: float
     data: str
+
+
+class FinanceReservaIn(BaseModel):
+    nome: str
+    tipo: str = "emergencia"
+    meta: float
+    prazo: Optional[str] = None
+    observacao: Optional[str] = None
+
+
+class FinanceAporteIn(BaseModel):
+    valor: float
+    data: str
+    observacao: Optional[str] = None
     
 class VendaCompletaIn(BaseModel):
     venda: VendaIn
