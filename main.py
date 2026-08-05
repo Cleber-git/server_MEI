@@ -16,7 +16,8 @@ from email.mime.text import MIMEText
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 import hashlib
 from psycopg2.extras import Json
 try:
@@ -31,6 +32,9 @@ except ImportError:
 # ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 app = FastAPI()
+
+FINANCE_SECRET = os.getenv("FINANCE_SECRET", os.getenv("SECRET_KEY", "financeiro-local-secret-change-me"))
+FINANCE_ALGORITHM = "HS256"
 
 def get_empresa(validation_uuid: str = Header(alias="validation-uuid")):
     return validation_uuid
@@ -51,6 +55,11 @@ async def validar_empresa(request: Request, call_next):
         "/codigoSenha",
         "/login"
     ]
+
+    # O modulo financeiro possui autenticacao propria e nao interfere na
+    # validacao por empresa usada pelas rotas legadas.
+    if path == "/financeiro" or path.startswith("/financeiro/") or path.startswith("/api/financeiro/"):
+        return await call_next(request)
 
     chave = request.headers.get("validation-uuid")
     chave_env = os.getenv("key_first_acess")
@@ -584,9 +593,79 @@ def pydantic_to_dict(model):
         return model.model_dump()
     return model.dict()
 
+def _finance_password_hash(password: str) -> str:
+    return hashlib.pbkdf2_hmac("sha256", password.encode(), b"clee-finance-v1", 120000).hex()
+
+
+def create_finance_tables():
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS financeiro_usuario (
+                id BIGSERIAL PRIMARY KEY,
+                login VARCHAR(80) UNIQUE NOT NULL,
+                senha_hash TEXT NOT NULL,
+                nome VARCHAR(120) NOT NULL,
+                ativo BOOLEAN NOT NULL DEFAULT TRUE,
+                criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS financeiro_lancamento (
+                id BIGSERIAL PRIMARY KEY,
+                usuario_id BIGINT NOT NULL REFERENCES financeiro_usuario(id) ON DELETE CASCADE,
+                descricao VARCHAR(180) NOT NULL,
+                valor NUMERIC(14,2) NOT NULL CHECK (valor >= 0),
+                natureza VARCHAR(20) NOT NULL DEFAULT 'despesa',
+                modalidade VARCHAR(30) NOT NULL DEFAULT 'variavel',
+                categoria VARCHAR(80) NOT NULL DEFAULT 'Outros',
+                data_vencimento DATE NOT NULL,
+                status VARCHAR(20) NOT NULL DEFAULT 'pendente',
+                recorrente BOOLEAN NOT NULL DEFAULT FALSE,
+                observacao TEXT,
+                criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS financeiro_viagem (
+                id BIGSERIAL PRIMARY KEY,
+                usuario_id BIGINT NOT NULL REFERENCES financeiro_usuario(id) ON DELETE CASCADE,
+                nome VARCHAR(160) NOT NULL,
+                destino VARCHAR(160) NOT NULL,
+                data_inicio DATE NOT NULL,
+                data_fim DATE NOT NULL,
+                orcamento NUMERIC(14,2) NOT NULL DEFAULT 0,
+                status VARCHAR(24) NOT NULL DEFAULT 'planejada',
+                observacao TEXT,
+                criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS financeiro_viagem_gasto (
+                id BIGSERIAL PRIMARY KEY,
+                viagem_id BIGINT NOT NULL REFERENCES financeiro_viagem(id) ON DELETE CASCADE,
+                descricao VARCHAR(180) NOT NULL,
+                categoria VARCHAR(80) NOT NULL DEFAULT 'Outros',
+                valor NUMERIC(14,2) NOT NULL CHECK (valor >= 0),
+                data DATE NOT NULL,
+                criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        """)
+        cur.execute("""
+            INSERT INTO financeiro_usuario (login, senha_hash, nome)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (login) DO UPDATE SET senha_hash = EXCLUDED.senha_hash, ativo = TRUE
+        """, ("Clee", _finance_password_hash("02032002"), "Clee"))
+        conn.commit()
+    finally:
+        put_conn(conn)
+
+
 @app.on_event("startup")
 def startup(): 
     create_tables()
+    create_finance_tables()
 
 
 # -------------------------------------------------------------------------------------
@@ -2243,4 +2322,153 @@ def redefinir_senha(valida: ValidarSenha):
 
     finally:
         put_conn(conn)
+
+
+# =====================================================================================
+# MODULO FINANCEIRO (aplicacao independente, mesmo servidor)
+# =====================================================================================
+def get_finance_user(authorization: Optional[str] = Header(default=None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Sessao nao informada")
+    try:
+        payload = jwt.decode(authorization[7:], FINANCE_SECRET, algorithms=[FINANCE_ALGORITHM])
+        return int(payload["sub"])
+    except (JWTError, KeyError, ValueError):
+        raise HTTPException(status_code=401, detail="Sessao invalida ou expirada")
+
+
+@app.post("/api/financeiro/login")
+def finance_login(data: FinanceLoginIn):
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT id, login, nome, senha_hash FROM financeiro_usuario WHERE lower(login)=lower(%s) AND ativo=TRUE", (data.login,))
+        user = cur.fetchone()
+        if not user or user[3] != _finance_password_hash(data.senha):
+            raise HTTPException(status_code=401, detail="Login ou senha incorretos")
+        token = jwt.encode({"sub": str(user[0]), "exp": datetime.utcnow() + timedelta(hours=12)}, FINANCE_SECRET, algorithm=FINANCE_ALGORITHM)
+        return {"token": token, "usuario": {"id": user[0], "login": user[1], "nome": user[2]}}
+    finally:
+        put_conn(conn)
+
+
+@app.get("/api/financeiro/dashboard")
+def finance_dashboard(user_id: int = Depends(get_finance_user)):
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT
+              COALESCE(SUM(valor) FILTER (WHERE natureza='receita' AND status='pago'),0),
+              COALESCE(SUM(valor) FILTER (WHERE natureza='despesa' AND status='pago'),0),
+              COALESCE(SUM(valor) FILTER (WHERE natureza='despesa' AND status='pendente'),0),
+              COALESCE(SUM(valor) FILTER (WHERE natureza='despesa' AND modalidade='fixo'),0)
+            FROM financeiro_lancamento WHERE usuario_id=%s
+        """, (user_id,))
+        totals = cur.fetchone()
+        cur.execute("""
+            SELECT categoria, COALESCE(SUM(valor),0) FROM financeiro_lancamento
+            WHERE usuario_id=%s AND natureza='despesa' GROUP BY categoria ORDER BY SUM(valor) DESC LIMIT 6
+        """, (user_id,))
+        categories = [{"categoria": r[0], "valor": float(r[1])} for r in cur.fetchall()]
+        cur.execute("""
+            SELECT to_char(date_trunc('month', data_vencimento), 'YYYY-MM'),
+              COALESCE(SUM(valor) FILTER (WHERE natureza='receita'),0),
+              COALESCE(SUM(valor) FILTER (WHERE natureza='despesa'),0)
+            FROM financeiro_lancamento WHERE usuario_id=%s AND data_vencimento >= CURRENT_DATE - INTERVAL '5 months'
+            GROUP BY 1 ORDER BY 1
+        """, (user_id,))
+        monthly = [{"mes": r[0], "receitas": float(r[1]), "despesas": float(r[2])} for r in cur.fetchall()]
+        cur.execute("""
+            SELECT l.id,l.descricao,l.valor,l.natureza,l.modalidade,l.categoria,l.data_vencimento,l.status,l.recorrente
+            FROM financeiro_lancamento l WHERE usuario_id=%s ORDER BY data_vencimento DESC, id DESC LIMIT 8
+        """, (user_id,))
+        recent = [_finance_row(r) for r in cur.fetchall()]
+        return {"receitas": float(totals[0]), "despesas": float(totals[1]), "pendente": float(totals[2]),
+                "fixos": float(totals[3]), "saldo": float(totals[0]-totals[1]), "categorias": categories,
+                "mensal": monthly, "recentes": recent}
+    finally:
+        put_conn(conn)
+
+
+def _finance_row(r):
+    return {"id": r[0], "descricao": r[1], "valor": float(r[2]), "natureza": r[3], "modalidade": r[4],
+            "categoria": r[5], "data_vencimento": r[6].isoformat(), "status": r[7], "recorrente": r[8]}
+
+
+@app.get("/api/financeiro/lancamentos")
+def finance_list(user_id: int = Depends(get_finance_user)):
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""SELECT id,descricao,valor,natureza,modalidade,categoria,data_vencimento,status,recorrente
+                       FROM financeiro_lancamento WHERE usuario_id=%s ORDER BY data_vencimento DESC,id DESC""", (user_id,))
+        return [_finance_row(r) for r in cur.fetchall()]
+    finally: put_conn(conn)
+
+
+@app.post("/api/financeiro/lancamentos")
+def finance_create(data: FinanceLancamentoIn, user_id: int = Depends(get_finance_user)):
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""INSERT INTO financeiro_lancamento
+            (usuario_id,descricao,valor,natureza,modalidade,categoria,data_vencimento,status,recorrente,observacao)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+            (user_id,data.descricao,data.valor,data.natureza,data.modalidade,data.categoria,data.data_vencimento,data.status,data.recorrente,data.observacao))
+        new_id = cur.fetchone()[0]; conn.commit()
+        return {"id": new_id, "sucesso": True}
+    finally: put_conn(conn)
+
+
+@app.delete("/api/financeiro/lancamentos/{item_id}")
+def finance_delete(item_id: int, user_id: int = Depends(get_finance_user)):
+    conn = get_conn()
+    try:
+        cur = conn.cursor(); cur.execute("DELETE FROM financeiro_lancamento WHERE id=%s AND usuario_id=%s", (item_id,user_id)); conn.commit()
+        return {"sucesso": cur.rowcount > 0}
+    finally: put_conn(conn)
+
+
+@app.get("/api/financeiro/viagens")
+def finance_trips(user_id: int = Depends(get_finance_user)):
+    conn = get_conn()
+    try:
+        cur=conn.cursor(); cur.execute("""SELECT v.id,v.nome,v.destino,v.data_inicio,v.data_fim,v.orcamento,v.status,
+            COALESCE(SUM(g.valor),0) FROM financeiro_viagem v LEFT JOIN financeiro_viagem_gasto g ON g.viagem_id=v.id
+            WHERE v.usuario_id=%s GROUP BY v.id ORDER BY v.data_inicio DESC""",(user_id,))
+        return [{"id":r[0],"nome":r[1],"destino":r[2],"data_inicio":r[3].isoformat(),"data_fim":r[4].isoformat(),
+                 "orcamento":float(r[5]),"status":r[6],"gasto":float(r[7])} for r in cur.fetchall()]
+    finally: put_conn(conn)
+
+
+@app.post("/api/financeiro/viagens")
+def finance_trip_create(data: FinanceViagemIn, user_id: int = Depends(get_finance_user)):
+    conn=get_conn()
+    try:
+        cur=conn.cursor(); cur.execute("""INSERT INTO financeiro_viagem
+            (usuario_id,nome,destino,data_inicio,data_fim,orcamento,status,observacao) VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+            (user_id,data.nome,data.destino,data.data_inicio,data.data_fim,data.orcamento,data.status,data.observacao))
+        new_id=cur.fetchone()[0]; conn.commit(); return {"id":new_id,"sucesso":True}
+    finally: put_conn(conn)
+
+
+@app.post("/api/financeiro/viagens/{trip_id}/gastos")
+def finance_trip_expense(trip_id: int, data: FinanceViagemGastoIn, user_id: int = Depends(get_finance_user)):
+    conn=get_conn()
+    try:
+        cur=conn.cursor(); cur.execute("SELECT 1 FROM financeiro_viagem WHERE id=%s AND usuario_id=%s",(trip_id,user_id))
+        if not cur.fetchone(): raise HTTPException(status_code=404,detail="Viagem nao encontrada")
+        cur.execute("INSERT INTO financeiro_viagem_gasto (viagem_id,descricao,categoria,valor,data) VALUES (%s,%s,%s,%s,%s) RETURNING id",
+                    (trip_id,data.descricao,data.categoria,data.valor,data.data))
+        new_id=cur.fetchone()[0]; conn.commit(); return {"id":new_id,"sucesso":True}
+    finally: put_conn(conn)
+
+
+@app.get("/financeiro", include_in_schema=False)
+def finance_app():
+    return FileResponse(os.path.join(os.path.dirname(__file__), "financeiro", "index.html"))
+
+
+app.mount("/financeiro/assets", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "financeiro")), name="financeiro-assets")
     

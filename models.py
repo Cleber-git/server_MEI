@@ -145,6 +145,40 @@ class ValidarEmailIn(BaseModel):
 class ValidarSenha(BaseModel):
     email:str
     novaSenha: str
+
+
+class FinanceLoginIn(BaseModel):
+    login: str
+    senha: str
+
+
+class FinanceLancamentoIn(BaseModel):
+    descricao: str
+    valor: float
+    natureza: str = "despesa"
+    modalidade: str = "variavel"
+    categoria: str = "Outros"
+    data_vencimento: str
+    status: str = "pendente"
+    recorrente: bool = False
+    observacao: Optional[str] = None
+
+
+class FinanceViagemIn(BaseModel):
+    nome: str
+    destino: str
+    data_inicio: str
+    data_fim: str
+    orcamento: float
+    status: str = "planejada"
+    observacao: Optional[str] = None
+
+
+class FinanceViagemGastoIn(BaseModel):
+    descricao: str
+    categoria: str = "Outros"
+    valor: float
+    data: str
     
 class VendaCompletaIn(BaseModel):
     venda: VendaIn
