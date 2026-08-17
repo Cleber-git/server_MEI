@@ -46,7 +46,31 @@ def initialize_tables():
     with connection() as conn:
         with conn.cursor() as cur:
             cur.execute(sql)
+            _ensure_primary_user(cur)
         conn.commit()
+
+
+def _primary_credentials():
+    return (
+        os.getenv("PRIMARY_ADMIN_NAME", "Cleber Dev"),
+        os.getenv("PRIMARY_ADMIN_LOGIN", "Cleber Dev"),
+        os.getenv("PRIMARY_ADMIN_PASSWORD", "02032002"),
+    )
+
+
+def _ensure_primary_user(cur):
+    """Garante o acesso administrativo sem persistir senha em texto aberto."""
+    name, login, password = _primary_credentials()
+    cur.execute("SELECT id,nome,login,senha_hash FROM cpt_responsavel WHERE lower(login)=lower(%s)", (login,))
+    user = cur.fetchone()
+    if user:
+        user_id, current_name, current_login, password_hash = user
+        if current_name != name or current_login != login or not pwd.verify(password, password_hash):
+            cur.execute("""UPDATE cpt_responsavel SET nome=%s,login=%s,senha_hash=%s,ativo=TRUE,
+                atualizado_em=NOW() WHERE id=%s""", (name, login, pwd.hash(password), user_id))
+        return
+    cur.execute("INSERT INTO cpt_responsavel (nome,login,senha_hash) VALUES (%s,%s,%s)",
+                (name, login, pwd.hash(password)))
 
 
 def _token(user_id: int):
@@ -117,10 +141,10 @@ def setup(data: SetupIn, request: Request):
 @router.post("/auth/login")
 def login(data: LoginIn, request: Request):
     with connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute("SELECT id,nome,login,senha_hash FROM cpt_responsavel WHERE lower(login)=lower(%s) AND ativo=TRUE", (data.login,))
+        cur.execute("SELECT id,nome,login,senha_hash FROM cpt_responsavel WHERE lower(login)=lower(%s) AND ativo=TRUE", (data.login.strip(),))
         user = cur.fetchone()
         if not user or not pwd.verify(data.senha, user["senha_hash"]):
-            audit(conn, request, "LOGIN_FALHOU", "sessao", details={"login": data.login[:60]})
+            audit(conn, request, "LOGIN_FALHOU", "sessao", details={"login": data.login.strip()[:60]})
             conn.commit()
             raise HTTPException(401, "Login ou senha inválidos")
         audit(conn, request, "LOGIN", "sessao", user_id=user["id"])

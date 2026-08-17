@@ -1,0 +1,2 @@
+"""Cadastro independente de fornecedores."""
+

@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#172f4a"><title>Base Fornecedores</title>
+  <link rel="stylesheet" href="/fornecedores/assets/styles.css">
+</head>
+<body>
+  <div id="toast"></div>
+  <main id="auth" class="auth"><section><span class="logo">F</span><p class="eyebrow">BASE DE PARCEIROS</p><h1>Fornecedores<br>bem organizados.</h1><p>Uma área independente para manter contatos e dados comerciais sempre à mão.</p></section><form id="authForm"><p class="eyebrow">ACESSO RESTRITO</p><h2 id="authTitle">Entrar</h2><label id="nameField" class="hidden">Seu nome<input name="nome"></label><label>Usuário<input name="login" required autocomplete="username"></label><label>Senha<input name="senha" type="password" minlength="8" required autocomplete="current-password"></label><p id="authError" class="error"></p><button>Continuar</button></form></main>
+  <div id="app" class="hidden"><aside><div><span class="logo">F</span><b>fornecedores</b></div><nav><button class="active">Cadastro</button></nav><button id="logout">Sair</button></aside><main><header><div><p class="eyebrow">GESTÃO INDEPENDENTE</p><h1>Fornecedores</h1></div><button id="newSupplier" class="primary">+ Novo fornecedor</button></header><section class="toolbar"><input id="search" placeholder="Buscar por nome, documento ou contato"><span id="count"></span></section><section id="supplierGrid" class="grid"></section></main></div>
+  <dialog id="modal"><form id="supplierForm" method="dialog"><header><div><p class="eyebrow">DADOS COMERCIAIS</p><h2 id="modalTitle">Novo fornecedor</h2></div><button type="button" id="close">×</button></header><input name="id" type="hidden"><div class="fields"><label class="full">Nome ou razão social *<input name="nome" required minlength="2"></label><label>CPF/CNPJ<input name="documento"></label><label>Nome do contato<input name="contato"></label><label>Telefone<input name="telefone" type="tel"></label><label>E-mail<input name="email" type="email"></label><label class="full">Chave Pix<input name="chave_pix"></label><label class="full">Endereço<textarea name="endereco" rows="2"></textarea></label><label class="full">Observações<textarea name="observacoes" rows="3"></textarea></label></div><p id="formError" class="error"></p><button class="primary full-button">Salvar fornecedor</button></form></dialog>
+  <script src="/fornecedores/assets/app.js"></script>
+</body></html>

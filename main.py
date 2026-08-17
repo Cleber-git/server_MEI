@@ -25,6 +25,7 @@ from fiscal.api import router as fiscal_router
 from fiscal.auth import router as auth_router
 from fiscal.errors import ApiProblem, api_problem_handler
 from cpt_recursos.api import router as cpt_recursos_router, initialize_tables as initialize_cpt_recursos
+from fornecedores.api import router as fornecedores_router, initialize_tables as initialize_fornecedores
 try:
     import nfe
 except ImportError:
@@ -41,6 +42,7 @@ app.add_exception_handler(ApiProblem, api_problem_handler)
 app.include_router(auth_router)
 app.include_router(fiscal_router)
 app.include_router(cpt_recursos_router)
+app.include_router(fornecedores_router)
 
 FINANCE_SECRET = os.getenv("FINANCE_SECRET", os.getenv("SECRET_KEY", "financeiro-local-secret-change-me"))
 FINANCE_ALGORITHM = "HS256"
@@ -80,6 +82,10 @@ async def validar_empresa(request: Request, call_next):
 
     if (path == "/cpt_recursos" or path.startswith("/cpt_recursos/")
             or path.startswith("/api/cpt_recursos/")):
+        return await call_next(request)
+
+    if (path == "/fornecedores" or path.startswith("/fornecedores/")
+            or path == "/api/fornecedores" or path.startswith("/api/fornecedores/")):
         return await call_next(request)
 
     chave = request.headers.get("validation-uuid")
@@ -697,6 +703,7 @@ def startup():
     create_tables()
     create_finance_tables()
     initialize_cpt_recursos()
+    initialize_fornecedores()
 
 
 # -------------------------------------------------------------------------------------
@@ -2593,5 +2600,17 @@ app.mount(
     "/cpt_recursos/assets",
     StaticFiles(directory=os.path.join(os.path.dirname(__file__), "cpt_recursos")),
     name="cpt-recursos-assets",
+)
+
+
+@app.get("/fornecedores", include_in_schema=False)
+def fornecedores_app():
+    return FileResponse(os.path.join(os.path.dirname(__file__), "fornecedores", "index.html"))
+
+
+app.mount(
+    "/fornecedores/assets",
+    StaticFiles(directory=os.path.join(os.path.dirname(__file__), "fornecedores")),
+    name="fornecedores-assets",
 )
     

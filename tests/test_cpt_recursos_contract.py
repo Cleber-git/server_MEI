@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from cpt_recursos.api import make_slug, pwd, router
+from cpt_recursos.api import _primary_credentials, make_slug, pwd, router
 from cpt_recursos.schemas import OrderIn, SetupIn, TeamMemberIn
 
 
@@ -45,6 +45,13 @@ def test_login_password_is_securely_hashed_and_long_enough():
 
 def test_campaign_slug_is_url_safe():
     assert make_slug("Hambúrguer Solidário 2026") == "hamburguer-solidario-2026"
+
+
+def test_primary_login_credentials_are_available(monkeypatch):
+    monkeypatch.delenv("PRIMARY_ADMIN_NAME", raising=False)
+    monkeypatch.delenv("PRIMARY_ADMIN_LOGIN", raising=False)
+    monkeypatch.delenv("PRIMARY_ADMIN_PASSWORD", raising=False)
+    assert _primary_credentials() == ("Cleber Dev", "Cleber Dev", "02032002")
 
 
 def test_database_contract_contains_audit_and_payment_constraints():

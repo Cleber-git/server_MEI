@@ -70,3 +70,4 @@ class TeamMemberIn(BaseModel):
 class ResponsibleIn(BaseModel):
     nome: str = Field(min_length=2, max_length=140)
     chave_pix: str = Field(default="", max_length=180)
+
