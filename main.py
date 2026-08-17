@@ -24,6 +24,7 @@ from uuid import uuid4
 from fiscal.api import router as fiscal_router
 from fiscal.auth import router as auth_router
 from fiscal.errors import ApiProblem, api_problem_handler
+from cpt_recursos.api import router as cpt_recursos_router, initialize_tables as initialize_cpt_recursos
 try:
     import nfe
 except ImportError:
@@ -39,6 +40,7 @@ app = FastAPI()
 app.add_exception_handler(ApiProblem, api_problem_handler)
 app.include_router(auth_router)
 app.include_router(fiscal_router)
+app.include_router(cpt_recursos_router)
 
 FINANCE_SECRET = os.getenv("FINANCE_SECRET", os.getenv("SECRET_KEY", "financeiro-local-secret-change-me"))
 FINANCE_ALGORITHM = "HS256"
@@ -72,9 +74,12 @@ async def validar_empresa(request: Request, call_next):
         "/login"
     ]
 
-    # O modulo financeiro possui autenticacao propria e nao interfere na
-    # validacao por empresa usada pelas rotas legadas.
+    # Modulos web independentes nao usam a validacao por empresa das rotas legadas.
     if path == "/financeiro" or path.startswith("/financeiro/") or path.startswith("/api/financeiro/"):
+        return await call_next(request)
+
+    if (path == "/cpt_recursos" or path.startswith("/cpt_recursos/")
+            or path.startswith("/api/cpt_recursos/")):
         return await call_next(request)
 
     chave = request.headers.get("validation-uuid")
@@ -691,6 +696,7 @@ def create_finance_tables():
 def startup(): 
     create_tables()
     create_finance_tables()
+    initialize_cpt_recursos()
 
 
 # -------------------------------------------------------------------------------------
@@ -2576,4 +2582,16 @@ def finance_app():
 
 
 app.mount("/financeiro/assets", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "financeiro")), name="financeiro-assets")
+
+
+@app.get("/cpt_recursos", include_in_schema=False)
+def cpt_recursos_app():
+    return FileResponse(os.path.join(os.path.dirname(__file__), "cpt_recursos", "index.html"))
+
+
+app.mount(
+    "/cpt_recursos/assets",
+    StaticFiles(directory=os.path.join(os.path.dirname(__file__), "cpt_recursos")),
+    name="cpt-recursos-assets",
+)
     

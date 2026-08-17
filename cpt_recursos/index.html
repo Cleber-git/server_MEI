@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#18392b">
+  <title>Capta — Captação de recursos</title>
+  <link rel="stylesheet" href="/cpt_recursos/assets/styles.css">
+</head>
+<body>
+  <div id="toast" class="toast" role="status"></div>
+  <header class="topbar">
+    <a class="brand" href="#cliente"><span>C</span>capta</a>
+    <div class="mode-switch" aria-label="Escolha sua área">
+      <button data-mode="cliente" class="active">Sou cliente</button>
+      <button data-mode="gestor">Área do responsável</button>
+    </div>
+  </header>
+
+  <main id="clientArea" class="client-layout">
+    <section class="hero">
+      <div><span class="eyebrow">CAPTAÇÃO SIMPLES E TRANSPARENTE</span><h1>Escolha. Apoie.<br><em>Faça acontecer.</em></h1><p>Encontre uma campanha, monte seu pedido e combine a coleta em poucos passos.</p></div>
+      <div class="hero-shape"><b>+</b><i></i><i></i></div>
+    </section>
+    <section class="content-shell">
+      <div class="section-head"><div><span class="eyebrow">CAMPANHAS ATIVAS</span><h2 id="clientTitle">O que você quer apoiar hoje?</h2></div><button id="backCampaigns" class="link hidden">← Ver campanhas</button></div>
+      <div id="campaignGrid" class="campaign-grid"><div class="loading">Buscando campanhas…</div></div>
+      <div id="orderExperience" class="hidden"></div>
+    </section>
+  </main>
+
+  <main id="authArea" class="auth-layout hidden">
+    <section class="auth-copy"><a class="brand light" href="#cliente"><span>C</span>capta</a><div><span class="eyebrow">GESTÃO QUE APROXIMA</span><h1>Todos os pedidos.<br>Uma visão clara.</h1><p>Controle pagamentos, equipe e resultados de cada campanha em um só lugar.</p></div></section>
+    <form id="authForm" class="auth-card"><span class="eyebrow">ÁREA RESTRITA</span><h2 id="authTitle">Acesse sua conta</h2><p id="authHint">Use os dados do responsável pela captação.</p><div id="setupName" class="hidden"><label>Nome do responsável<input name="nome" autocomplete="name"></label></div><label>Usuário<input name="login" autocomplete="username" required></label><label>Senha<input name="senha" type="password" autocomplete="current-password" minlength="8" required></label><p id="authError" class="error"></p><button class="primary wide">Entrar</button></form>
+  </main>
+
+  <div id="managerApp" class="manager hidden">
+    <aside><a class="brand light" href="#"><span>C</span>capta</a><nav><button data-view="dashboard" class="active">Visão geral</button><button data-view="pedidos">Pedidos</button><button data-view="campanhas">Campanhas</button><button data-view="equipe">Equipe</button><button data-view="relatorio">Relatório</button><button data-view="configuracoes">Configurações</button></nav><button id="logout" class="logout">Sair da conta</button></aside>
+    <div class="manager-main"><header><div><small id="managerDate"></small><h1 id="viewTitle">Visão geral</h1></div><button id="refresh" class="secondary">Atualizar dados</button></header><div id="managerContent"></div></div>
+    <nav class="mobile-nav"><button data-view="dashboard" class="active">Resumo</button><button data-view="pedidos">Pedidos</button><button data-view="campanhas">Campanhas</button><button data-view="equipe">Equipe</button></nav>
+  </div>
+  <script src="/cpt_recursos/assets/app.js"></script>
+</body>
+</html>
