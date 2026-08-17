@@ -31,6 +31,16 @@ def test_collection_date_defaults_to_today():
     assert order.data_coleta == date.today()
 
 
+def test_order_accepts_a_trimmed_custom_description():
+    order = OrderIn(
+        campanha_id=1,
+        cliente_nome="Cliente Teste",
+        observacoes="  Sem cebola e com embalagem para presente  ",
+        itens=[{"produto_id": 1, "quantidade": 1}],
+    )
+    assert order.observacoes == "Sem cebola e com embalagem para presente"
+
+
 def test_temporary_member_requires_end_date():
     with pytest.raises(ValidationError):
         TeamMemberIn(nome="Pessoa Temporária", tipo="temporario")
@@ -59,3 +69,4 @@ def test_database_contract_contains_audit_and_payment_constraints():
     assert "CREATE TABLE IF NOT EXISTS cpt_auditoria" in sql
     assert "status_pagamento IN ('pago', 'pendente')" in sql
     assert "tipo = 'oficial' OR fim_em IS NOT NULL" in sql
+    assert "ADD COLUMN IF NOT EXISTS observacoes" in sql

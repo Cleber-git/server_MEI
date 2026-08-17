@@ -39,6 +39,7 @@ class OrderIn(BaseModel):
     campanha_id: int
     cliente_nome: str = Field(min_length=2, max_length=140)
     data_coleta: date = Field(default_factory=date.today)
+    observacoes: str = Field(default="", max_length=1000)
     itens: list[OrderItemIn] = Field(min_length=1, max_length=50)
 
     @field_validator("cliente_nome")
@@ -48,6 +49,11 @@ class OrderIn(BaseModel):
         if len(value) < 2:
             raise ValueError("Informe o nome do cliente")
         return value
+
+    @field_validator("observacoes")
+    @classmethod
+    def clean_notes(cls, value: str) -> str:
+        return value.strip()
 
 
 class PaymentIn(BaseModel):
@@ -70,4 +76,3 @@ class TeamMemberIn(BaseModel):
 class ResponsibleIn(BaseModel):
     nome: str = Field(min_length=2, max_length=140)
     chave_pix: str = Field(default="", max_length=180)
-

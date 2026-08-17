@@ -192,9 +192,9 @@ def create_order(data: OrderIn, request: Request):
         if len(products) != len(ids):
             raise HTTPException(422, "Um ou mais produtos não estão disponíveis")
         total = sum(products[item.produto_id]["preco"] * item.quantidade for item in data.itens)
-        cur.execute("""INSERT INTO cpt_pedido (campanha_id,cliente_nome,data_coleta,valor_total)
-            VALUES (%s,%s,%s,%s) RETURNING id,status_pagamento,valor_total,data_coleta""",
-            (data.campanha_id, data.cliente_nome, data.data_coleta, total))
+        cur.execute("""INSERT INTO cpt_pedido (campanha_id,cliente_nome,data_coleta,observacoes,valor_total)
+            VALUES (%s,%s,%s,%s,%s) RETURNING id,status_pagamento,valor_total,data_coleta""",
+            (data.campanha_id, data.cliente_nome, data.data_coleta, data.observacoes, total))
         order = cur.fetchone()
         for item in data.itens:
             product = products[item.produto_id]
@@ -285,7 +285,7 @@ def orders(data_coleta: date | None = None, campaign_id: int | None = None, user
     with connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
         params=[user["id"],target]; extra=""
         if campaign_id is not None: extra=" AND c.id=%s"; params.append(campaign_id)
-        cur.execute("""SELECT p.id,p.cliente_nome,p.data_coleta,p.status_pagamento,p.valor_total,p.criado_em,
+        cur.execute("""SELECT p.id,p.cliente_nome,p.data_coleta,p.observacoes,p.status_pagamento,p.valor_total,p.criado_em,
             c.id campanha_id,c.nome campanha_nome,COALESCE(json_agg(json_build_object('nome',i.produto_nome,'quantidade',i.quantidade,'subtotal',i.subtotal)) FILTER (WHERE i.id IS NOT NULL),'[]') itens
             FROM cpt_pedido p JOIN cpt_campanha c ON c.id=p.campanha_id LEFT JOIN cpt_pedido_item i ON i.pedido_id=p.id
             WHERE c.responsavel_id=%s AND p.data_coleta=%s"""+extra+" GROUP BY p.id,c.id ORDER BY p.criado_em DESC",params)
@@ -320,7 +320,7 @@ def dashboard(user=Depends(current_user)):
 @router.get("/relatorios/ultimas-24h")
 def report(user=Depends(current_user)):
     with connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute("""SELECT p.id,p.cliente_nome,p.data_coleta,p.status_pagamento,p.valor_total,p.criado_em,c.nome campanha
+        cur.execute("""SELECT p.id,p.cliente_nome,p.data_coleta,p.observacoes,p.status_pagamento,p.valor_total,p.criado_em,c.nome campanha
             FROM cpt_pedido p JOIN cpt_campanha c ON c.id=p.campanha_id
             WHERE c.responsavel_id=%s AND p.criado_em >= NOW()-INTERVAL '24 hours' ORDER BY p.criado_em DESC""",(user["id"],)); rows=cur.fetchall()
         return {"gerado_em":datetime.now(timezone.utc),"quantidade":len(rows),"total":sum(r["valor_total"] for r in rows),"pedidos":rows}
