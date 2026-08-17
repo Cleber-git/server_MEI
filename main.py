@@ -20,6 +20,10 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 import hashlib
 from psycopg2.extras import Json
+from uuid import uuid4
+from fiscal.api import router as fiscal_router
+from fiscal.auth import router as auth_router
+from fiscal.errors import ApiProblem, api_problem_handler
 try:
     import nfe
 except ImportError:
@@ -32,6 +36,9 @@ except ImportError:
 # ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 app = FastAPI()
+app.add_exception_handler(ApiProblem, api_problem_handler)
+app.include_router(auth_router)
+app.include_router(fiscal_router)
 
 FINANCE_SECRET = os.getenv("FINANCE_SECRET", os.getenv("SECRET_KEY", "financeiro-local-secret-change-me"))
 FINANCE_ALGORITHM = "HS256"
@@ -43,9 +50,18 @@ def get_empresa(validation_uuid: str = Header(alias="validation-uuid")):
 async def validar_empresa(request: Request, call_next):
 
     path = request.url.path.rstrip("/")
-    if path == "/venda-completa":
-        body = await request.body()
-        print(body)
+    request.state.correlation_id = request.headers.get("x-correlation-id") or str(uuid4())
+
+    # Fiscal/auth v1 have mandatory Bearer/session authorization and must never
+    # fall back to the legacy validation-uuid mechanism.
+    if path.startswith("/api/v1/fiscal") or path.startswith("/api/v1/auth"):
+        response = await call_next(request)
+        response.headers["X-Correlation-Id"] = request.state.correlation_id
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Cache-Control"] = "no-store"
+        return response
         
     rotas_publicas = [
         "/empresa",
@@ -63,7 +79,6 @@ async def validar_empresa(request: Request, call_next):
 
     chave = request.headers.get("validation-uuid")
     chave_env = os.getenv("key_first_acess")
-    print(chave, chave_env, "endPoint: ", path)
     if request.method == "POST" and path in rotas_publicas:
 
         if chave != chave_env:
@@ -519,26 +534,11 @@ def emitir_nfse_servico(payload_fiscal: dict) -> dict:
                 "erroFiscal": str(exc),
             }
 
-    if config["ambiente"] == "homologacao" and config["mock_homologacao"]:
-        protocolo = hashlib.sha256(json.dumps(payload_fiscal, sort_keys=True).encode()).hexdigest()[:16].upper()
-        return {
-            "sucesso": True,
-            "status": "AUTORIZADA",
-            "mensagem": "NFS-e autorizada em homologacao local. Configure FISCAL_API_BASE_URL e FISCAL_API_TOKEN para usar o provedor fiscal.",
-            "numero": f"HOM-{protocolo[:8]}",
-            "codigoVerificacao": protocolo,
-            "urlPdf": None,
-            "urlXml": None,
-            "urlConsulta": None,
-            "protocolo": protocolo,
-            "erroFiscal": None,
-        }
-
     return {
         "sucesso": False,
-        "status": "CONFIGURACAO_PENDENTE",
-        "mensagem": "Provedor fiscal nao configurado. Defina FISCAL_API_BASE_URL e FISCAL_API_TOKEN em homologacao.",
-        "erroFiscal": "FISCAL_PROVIDER_NOT_CONFIGURED",
+        "status": "INDISPONIVEL",
+        "mensagem": "Emissao fiscal legada desativada. Use /api/v1/fiscal com Bearer; integracao oficial requer homologacao.",
+        "erroFiscal": "CAPABILITY_NOT_AVAILABLE",
     }
 
 

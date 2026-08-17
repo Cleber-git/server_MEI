@@ -1,0 +1,6 @@
+-r requirements.txt
+python-multipart==0.0.20
+requests==2.32.4
+cryptography==45.0.5
+pytest==8.4.1
+ruff==0.12.5
