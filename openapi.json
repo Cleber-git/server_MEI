@@ -820,6 +820,1450 @@
         }
       }
     },
+    "/vendas/produtos/sefaz": {
+      "post": {
+        "tags": [
+          "vendas-produtos"
+        ],
+        "summary": "Create Sale",
+        "operationId": "create_sale_vendas_produtos_sefaz_post",
+        "parameters": [
+          {
+            "name": "validation-uuid",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Validation-Uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductSale"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Empresa não autenticada"
+          },
+          "403": {
+            "description": "Empresa do payload diverge da empresa autenticada"
+          },
+          "409": {
+            "description": "Conflito idempotente, configuração incompleta ou produção bloqueada"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/vendas/produtos/sefaz/notificacoes": {
+      "get": {
+        "tags": [
+          "vendas-produtos"
+        ],
+        "summary": "Notifications",
+        "operationId": "notifications_vendas_produtos_sefaz_notificacoes_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "validation-uuid",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Validation-Uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Empresa não autenticada"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/vendas/produtos/sefaz/{venda_id}/notificado": {
+      "post": {
+        "tags": [
+          "vendas-produtos"
+        ],
+        "summary": "Acknowledge",
+        "operationId": "acknowledge_vendas_produtos_sefaz__venda_id__notificado_post",
+        "parameters": [
+          {
+            "name": "venda_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Venda Id"
+            }
+          },
+          {
+            "name": "validation-uuid",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Validation-Uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Empresa não autenticada"
+          },
+          "404": {
+            "description": "Resultado fiscal inexistente, de outro tenant ou ainda processando"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cpt_recursos/auth/status": {
+      "get": {
+        "tags": [
+          "Captação de recursos"
+        ],
+        "summary": "Setup Status",
+        "operationId": "setup_status_api_cpt_recursos_auth_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cpt_recursos/auth/setup": {
+      "post": {
+        "tags": [
+          "Captação de recursos"
+        ],
+        "summary": "Setup",
+        "operationId": "setup_api_cpt_recursos_auth_setup_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetupIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cpt_recursos/auth/login": {
+      "post": {
+        "tags": [
+          "Captação de recursos"
+        ],
+        "summary": "Login",
+        "operationId": "login_api_cpt_recursos_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cpt_recursos/public/campanhas": {
+      "get": {
+        "tags": [
+          "Captação de recursos"
+        ],
+        "summary": "Public Campaigns",
+        "operationId": "public_campaigns_api_cpt_recursos_public_campanhas_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cpt_recursos/public/campanhas/{slug}": {
+      "get": {
+        "tags": [
+          "Captação de recursos"
+        ],
+        "summary": "Public Campaign",
+        "operationId": "public_campaign_api_cpt_recursos_public_campanhas__slug__get",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cpt_recursos/public/pedidos": {
+      "post": {
+        "tags": [
+          "Captação de recursos"
+        ],
+        "summary": "Create Order",
+        "operationId": "create_order_api_cpt_recursos_public_pedidos_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cpt_recursos/me": {
+      "get": {
+        "tags": [
+          "Captação de recursos"
+        ],
+        "summary": "Me",
+        "operationId": "me_api_cpt_recursos_me_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Captação de recursos"
+        ],
+        "summary": "Update Me",
+        "operationId": "update_me_api_cpt_recursos_me_put",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResponsibleIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cpt_recursos/campanhas": {
+      "get": {
+        "tags": [
+          "Captação de recursos"
+        ],
+        "summary": "Campaigns",
+        "operationId": "campaigns_api_cpt_recursos_campanhas_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Captação de recursos"
+        ],
+        "summary": "Add Campaign",
+        "operationId": "add_campaign_api_cpt_recursos_campanhas_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CampaignIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cpt_recursos/campanhas/{campaign_id}/produtos": {
+      "post": {
+        "tags": [
+          "Captação de recursos"
+        ],
+        "summary": "Add Product",
+        "operationId": "add_product_api_cpt_recursos_campanhas__campaign_id__produtos_post",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Campaign Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Captação de recursos"
+        ],
+        "summary": "Products",
+        "operationId": "products_api_cpt_recursos_campanhas__campaign_id__produtos_get",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Campaign Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cpt_recursos/equipe": {
+      "get": {
+        "tags": [
+          "Captação de recursos"
+        ],
+        "summary": "Team",
+        "operationId": "team_api_cpt_recursos_equipe_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Captação de recursos"
+        ],
+        "summary": "Add Member",
+        "operationId": "add_member_api_cpt_recursos_equipe_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeamMemberIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cpt_recursos/equipe/{member_id}": {
+      "delete": {
+        "tags": [
+          "Captação de recursos"
+        ],
+        "summary": "Remove Member",
+        "operationId": "remove_member_api_cpt_recursos_equipe__member_id__delete",
+        "parameters": [
+          {
+            "name": "member_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Member Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cpt_recursos/pedidos": {
+      "get": {
+        "tags": [
+          "Captação de recursos"
+        ],
+        "summary": "Orders",
+        "operationId": "orders_api_cpt_recursos_pedidos_get",
+        "parameters": [
+          {
+            "name": "data_coleta",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Data Coleta"
+            }
+          },
+          {
+            "name": "campaign_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Campaign Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cpt_recursos/pedidos/{order_id}/pagamento": {
+      "patch": {
+        "tags": [
+          "Captação de recursos"
+        ],
+        "summary": "Payment",
+        "operationId": "payment_api_cpt_recursos_pedidos__order_id__pagamento_patch",
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Order Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cpt_recursos/dashboard": {
+      "get": {
+        "tags": [
+          "Captação de recursos"
+        ],
+        "summary": "Dashboard",
+        "operationId": "dashboard_api_cpt_recursos_dashboard_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cpt_recursos/relatorios/ultimas-24h": {
+      "get": {
+        "tags": [
+          "Captação de recursos"
+        ],
+        "summary": "Report",
+        "operationId": "report_api_cpt_recursos_relatorios_ultimas_24h_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cpt_recursos/auditoria": {
+      "get": {
+        "tags": [
+          "Captação de recursos"
+        ],
+        "summary": "Audit Log",
+        "operationId": "audit_log_api_cpt_recursos_auditoria_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/fornecedores/auth/status": {
+      "get": {
+        "tags": [
+          "Fornecedores"
+        ],
+        "summary": "Auth Status",
+        "operationId": "auth_status_api_fornecedores_auth_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/fornecedores/auth/setup": {
+      "post": {
+        "tags": [
+          "Fornecedores"
+        ],
+        "summary": "Setup",
+        "operationId": "setup_api_fornecedores_auth_setup_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetupIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/fornecedores/auth/login": {
+      "post": {
+        "tags": [
+          "Fornecedores"
+        ],
+        "summary": "Login",
+        "operationId": "login_api_fornecedores_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/fornecedores": {
+      "get": {
+        "tags": [
+          "Fornecedores"
+        ],
+        "summary": "List Suppliers",
+        "operationId": "list_suppliers_api_fornecedores_get",
+        "parameters": [
+          {
+            "name": "busca",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 120,
+              "default": "",
+              "title": "Busca"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Fornecedores"
+        ],
+        "summary": "Create Supplier",
+        "operationId": "create_supplier_api_fornecedores_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupplierIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/fornecedores/cadastros/{supplier_id}": {
+      "get": {
+        "tags": [
+          "Fornecedores"
+        ],
+        "summary": "Get Supplier",
+        "operationId": "get_supplier_api_fornecedores_cadastros__supplier_id__get",
+        "parameters": [
+          {
+            "name": "supplier_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Supplier Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Fornecedores"
+        ],
+        "summary": "Update Supplier",
+        "operationId": "update_supplier_api_fornecedores_cadastros__supplier_id__put",
+        "parameters": [
+          {
+            "name": "supplier_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Supplier Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupplierIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Fornecedores"
+        ],
+        "summary": "Delete Supplier",
+        "operationId": "delete_supplier_api_fornecedores_cadastros__supplier_id__delete",
+        "parameters": [
+          {
+            "name": "supplier_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Supplier Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/fornecedores/auditoria/registros": {
+      "get": {
+        "tags": [
+          "Fornecedores"
+        ],
+        "summary": "Audit Records",
+        "operationId": "audit_records_api_fornecedores_auditoria_registros_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/": {
       "get": {
         "summary": "Read Root",
@@ -3159,6 +4603,38 @@
         ],
         "title": "Body_import_certificate_api_v1_fiscal_certificates_post"
       },
+      "CampaignIn": {
+        "properties": {
+          "nome": {
+            "type": "string",
+            "maxLength": 140,
+            "minLength": 3,
+            "title": "Nome"
+          },
+          "descricao": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Descricao",
+            "default": ""
+          },
+          "chave_pix": {
+            "type": "string",
+            "maxLength": 180,
+            "title": "Chave Pix",
+            "default": ""
+          },
+          "ativa": {
+            "type": "boolean",
+            "title": "Ativa",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "nome"
+        ],
+        "title": "CampaignIn"
+      },
       "CancelFiscalDocumentRequest": {
         "properties": {
           "reason": {
@@ -4156,6 +5632,24 @@
         ],
         "title": "ItemVendaIn"
       },
+      "LoginIn": {
+        "properties": {
+          "login": {
+            "type": "string",
+            "title": "Login"
+          },
+          "senha": {
+            "type": "string",
+            "title": "Senha"
+          }
+        },
+        "type": "object",
+        "required": [
+          "login",
+          "senha"
+        ],
+        "title": "LoginIn"
+      },
       "LogoutRequest": {
         "properties": {
           "refreshToken": {
@@ -4430,6 +5924,67 @@
         ],
         "title": "NotaServicoResponse"
       },
+      "OrderIn": {
+        "properties": {
+          "campanha_id": {
+            "type": "integer",
+            "title": "Campanha Id"
+          },
+          "cliente_nome": {
+            "type": "string",
+            "maxLength": 140,
+            "minLength": 2,
+            "title": "Cliente Nome"
+          },
+          "data_coleta": {
+            "type": "string",
+            "format": "date",
+            "title": "Data Coleta"
+          },
+          "observacoes": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Observacoes",
+            "default": ""
+          },
+          "itens": {
+            "items": {
+              "$ref": "#/components/schemas/OrderItemIn"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Itens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "campanha_id",
+          "cliente_nome",
+          "itens"
+        ],
+        "title": "OrderIn"
+      },
+      "OrderItemIn": {
+        "properties": {
+          "produto_id": {
+            "type": "integer",
+            "title": "Produto Id"
+          },
+          "quantidade": {
+            "type": "integer",
+            "maximum": 999.0,
+            "minimum": 1.0,
+            "title": "Quantidade"
+          }
+        },
+        "type": "object",
+        "required": [
+          "produto_id",
+          "quantidade"
+        ],
+        "title": "OrderItemIn"
+      },
       "PagamentoIn": {
         "properties": {
           "id": {
@@ -4506,6 +6061,23 @@
         ],
         "title": "Payment"
       },
+      "PaymentIn": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "pago",
+              "pendente"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "PaymentIn"
+      },
       "PdfVendaIn": {
         "properties": {
           "id": {
@@ -4572,6 +6144,45 @@
           "url"
         ],
         "title": "PerfilIn"
+      },
+      "ProductIn": {
+        "properties": {
+          "nome": {
+            "type": "string",
+            "maxLength": 140,
+            "minLength": 2,
+            "title": "Nome"
+          },
+          "descricao": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Descricao",
+            "default": ""
+          },
+          "preco": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Preco"
+          },
+          "ativo": {
+            "type": "boolean",
+            "title": "Ativo",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "nome",
+          "preco"
+        ],
+        "title": "ProductIn"
       },
       "ProductItem": {
         "properties": {
@@ -4776,6 +6387,80 @@
         ],
         "title": "ProductRequest"
       },
+      "ProductSale": {
+        "properties": {
+          "venda": {
+            "$ref": "#/components/schemas/VendaIn"
+          },
+          "itens": {
+            "items": {
+              "$ref": "#/components/schemas/ProductSaleItem"
+            },
+            "type": "array",
+            "maxItems": 990,
+            "minItems": 1,
+            "title": "Itens"
+          },
+          "xml": {
+            "type": "string",
+            "maxLength": 2000000,
+            "minLength": 1,
+            "title": "Xml"
+          }
+        },
+        "type": "object",
+        "required": [
+          "venda",
+          "itens",
+          "xml"
+        ],
+        "title": "ProductSale"
+      },
+      "ProductSaleItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "vendaId": {
+            "type": "string",
+            "title": "Vendaid"
+          },
+          "tipo": {
+            "type": "string",
+            "title": "Tipo"
+          },
+          "nome": {
+            "type": "string",
+            "title": "Nome"
+          },
+          "valor": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Valor"
+          },
+          "quantidade": {
+            "type": "integer",
+            "title": "Quantidade"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "vendaId",
+          "tipo",
+          "nome",
+          "valor",
+          "quantidade"
+        ],
+        "title": "ProductSaleItem"
+      },
       "Recipient": {
         "properties": {
           "name": {
@@ -4861,6 +6546,27 @@
           "refreshToken"
         ],
         "title": "RefreshRequest"
+      },
+      "ResponsibleIn": {
+        "properties": {
+          "nome": {
+            "type": "string",
+            "maxLength": 140,
+            "minLength": 2,
+            "title": "Nome"
+          },
+          "chave_pix": {
+            "type": "string",
+            "maxLength": 180,
+            "title": "Chave Pix",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "nome"
+        ],
+        "title": "ResponsibleIn"
       },
       "ServicoIn": {
         "properties": {
@@ -4957,6 +6663,134 @@
           "codigoMunicipalServico"
         ],
         "title": "ServicoNotaFiscal"
+      },
+      "SetupIn": {
+        "properties": {
+          "nome": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Nome"
+          },
+          "login": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 3,
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "title": "Login"
+          },
+          "senha": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 8,
+            "title": "Senha"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nome",
+          "login",
+          "senha"
+        ],
+        "title": "SetupIn"
+      },
+      "SupplierIn": {
+        "properties": {
+          "nome": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 2,
+            "title": "Nome"
+          },
+          "documento": {
+            "type": "string",
+            "maxLength": 24,
+            "title": "Documento",
+            "default": ""
+          },
+          "contato": {
+            "type": "string",
+            "maxLength": 140,
+            "title": "Contato",
+            "default": ""
+          },
+          "telefone": {
+            "type": "string",
+            "maxLength": 30,
+            "title": "Telefone",
+            "default": ""
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 180,
+            "title": "Email",
+            "default": ""
+          },
+          "chave_pix": {
+            "type": "string",
+            "maxLength": 180,
+            "title": "Chave Pix",
+            "default": ""
+          },
+          "endereco": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Endereco",
+            "default": ""
+          },
+          "observacoes": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Observacoes",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "nome"
+        ],
+        "title": "SupplierIn"
+      },
+      "TeamMemberIn": {
+        "properties": {
+          "nome": {
+            "type": "string",
+            "maxLength": 140,
+            "minLength": 2,
+            "title": "Nome"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "oficial",
+              "temporario"
+            ],
+            "title": "Tipo",
+            "default": "oficial"
+          },
+          "inicio_em": {
+            "type": "string",
+            "format": "date",
+            "title": "Inicio Em"
+          },
+          "fim_em": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fim Em"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nome"
+        ],
+        "title": "TeamMemberIn"
       },
       "TomadorNotaServico": {
         "properties": {

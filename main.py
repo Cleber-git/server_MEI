@@ -22,6 +22,7 @@ import hashlib
 from psycopg2.extras import Json
 from uuid import uuid4
 from fiscal.api import router as fiscal_router
+from fiscal.product_sales import router as product_sales_router
 from fiscal.auth import router as auth_router
 from fiscal.errors import ApiProblem, api_problem_handler
 from cpt_recursos.api import router as cpt_recursos_router, initialize_tables as initialize_cpt_recursos
@@ -41,6 +42,7 @@ app = FastAPI()
 app.add_exception_handler(ApiProblem, api_problem_handler)
 app.include_router(auth_router)
 app.include_router(fiscal_router)
+app.include_router(product_sales_router)
 app.include_router(cpt_recursos_router)
 app.include_router(fornecedores_router)
 
