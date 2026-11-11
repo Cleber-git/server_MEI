@@ -210,6 +210,14 @@ class CancelFiscalDocumentRequest(StrictModel):
     reason: str = Field(min_length=15, max_length=255)
 
 
+class LoginRequest(StrictModel):
+    """Contrato 3.1. ``login`` aceita e-mail ou CNPJ, como no ``/login`` legado."""
+
+    login: str = Field(min_length=1, max_length=254)
+    password: str = Field(min_length=1, max_length=1024)
+    deviceId: str | None = Field(default=None, min_length=1, max_length=128)
+
+
 class RefreshRequest(StrictModel):
     refreshToken: str = Field(min_length=43, max_length=512)
 

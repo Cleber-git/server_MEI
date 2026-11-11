@@ -25,6 +25,8 @@ from fiscal.api import router as fiscal_router
 from fiscal.product_sales import router as product_sales_router
 from fiscal.auth import router as auth_router
 from fiscal.http import install as install_fiscal_http
+from fiscal.config import assert_startup_ready as assert_fiscal_startup_ready
+from fiscal.passwords import check_and_upgrade as check_password_and_upgrade
 from cpt_recursos.api import router as cpt_recursos_router, initialize_tables as initialize_cpt_recursos
 from fornecedores.api import router as fornecedores_router, initialize_tables as initialize_fornecedores
 try:
@@ -697,6 +699,8 @@ def create_finance_tables():
 
 @app.on_event("startup")
 def startup(): 
+    # Fiscal ligado sem chave JWT válida: falha aqui, antes de aceitar tráfego (F2).
+    assert_fiscal_startup_ready()
     create_tables()
     create_finance_tables()
     initialize_cpt_recursos()
@@ -2177,8 +2181,10 @@ def login(data: loginIn):
         # verificar senha
         # senha_hash = hashlib.sha256(data.senha.encode()).hexdigest()
 
-        if data.senha != user[2]:
+        # Aceita bcrypt e texto puro (legado) e migra para bcrypt no sucesso (F2).
+        if not check_password_and_upgrade(cur, user[0], data.senha, user[2]):
             raise HTTPException(402, "Senha incorreta")
+        conn.commit()
 
         # buscar empresa
         cur.execute("""
@@ -2198,7 +2204,9 @@ def login(data: loginIn):
         usuario_obj = Usuario(
             uuid=user[0],
             email=user[1],
-            senhaHash=user[2],
+            # Nunca devolve a senha guardada (era texto puro). O app não usa este
+            # campo: o login offline compara com o hash calculado no aparelho.
+            senhaHash="",
             nome=user[3],
             empresaUuid=user[4],
             ativo=user[5],

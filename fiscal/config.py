@@ -38,3 +38,25 @@ class Settings:
 
 
 settings = Settings()
+
+
+def assert_startup_ready(current: Settings | None = None) -> None:
+    """Com o fiscal ligado, o servidor não sobe sem chave JWT válida (F2).
+
+    Segredo com menos de 32 bytes é descartado por ``signing_keys()``, então
+    também barra aqui. A mensagem nunca traz o valor das chaves.
+    """
+    current = current or settings
+    if not current.fiscal_enabled:
+        return
+    keys = current.signing_keys()
+    if not keys:
+        raise RuntimeError(
+            "FISCAL_FEATURE_ENABLED=true exige JWT_SIGNING_KEYS no formato "
+            "kid:segredo, com segredo de pelo menos 32 bytes"
+        )
+    if current.jwt_active_kid not in keys:
+        raise RuntimeError(
+            "FISCAL_FEATURE_ENABLED=true exige JWT_ACTIVE_KID igual a um kid de "
+            "JWT_SIGNING_KEYS"
+        )
