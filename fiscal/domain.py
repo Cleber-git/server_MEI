@@ -35,14 +35,12 @@ class FiscalStatus(str, Enum):
     ERROR_FINAL = "ERROR_FINAL"
 
 
+# Espelho exato de ``FiscalRules.transitions`` do ``shared`` do app (o app valida as
+# transições que observa). ``ERROR_FINAL`` só vem de VALIDATING ou ERROR_RETRYABLE.
 TRANSITIONS = {
     FiscalStatus.DRAFT: {FiscalStatus.VALIDATING},
     FiscalStatus.VALIDATING: {FiscalStatus.QUEUED, FiscalStatus.ERROR_FINAL},
-    FiscalStatus.QUEUED: {
-        FiscalStatus.SUBMITTED,
-        FiscalStatus.ERROR_RETRYABLE,
-        FiscalStatus.ERROR_FINAL,
-    },
+    FiscalStatus.QUEUED: {FiscalStatus.SUBMITTED, FiscalStatus.ERROR_RETRYABLE},
     FiscalStatus.SUBMITTED: {
         FiscalStatus.PROCESSING,
         FiscalStatus.AUTHORIZED,
@@ -54,20 +52,17 @@ TRANSITIONS = {
         FiscalStatus.REJECTED,
         FiscalStatus.CONTINGENCY_PENDING,
         FiscalStatus.ERROR_RETRYABLE,
-        FiscalStatus.ERROR_FINAL,
     },
     FiscalStatus.AUTHORIZED: {FiscalStatus.CANCEL_PENDING},
     FiscalStatus.CANCEL_PENDING: {
         FiscalStatus.CANCELLED,
         FiscalStatus.AUTHORIZED,
         FiscalStatus.ERROR_RETRYABLE,
-        FiscalStatus.ERROR_FINAL,
     },
     FiscalStatus.CONTINGENCY_PENDING: {
         FiscalStatus.SUBMITTED,
         FiscalStatus.PROCESSING,
         FiscalStatus.ERROR_RETRYABLE,
-        FiscalStatus.ERROR_FINAL,
     },
     FiscalStatus.ERROR_RETRYABLE: {
         FiscalStatus.QUEUED,
@@ -82,7 +77,7 @@ def assert_transition(current: FiscalStatus, target: FiscalStatus) -> None:
         raise ApiProblem(
             409,
             "INVALID_STATE_TRANSITION",
-            f"Transição {current.value} para {target.value} não permitida",
+            "Esta ação não é permitida no estado atual do documento.",
         )
 
 

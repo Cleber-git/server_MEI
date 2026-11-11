@@ -26,6 +26,7 @@ from fiscal.product_sales import router as product_sales_router
 from fiscal.auth import router as auth_router
 from fiscal.http import install as install_fiscal_http
 from fiscal.config import assert_startup_ready as assert_fiscal_startup_ready
+from fiscal import worker as fiscal_worker
 from fiscal.passwords import check_and_upgrade as check_password_and_upgrade
 from cpt_recursos.api import router as cpt_recursos_router, initialize_tables as initialize_cpt_recursos
 from fornecedores.api import router as fornecedores_router, initialize_tables as initialize_fornecedores
@@ -705,6 +706,13 @@ def startup():
     create_finance_tables()
     initialize_cpt_recursos()
     initialize_fornecedores()
+    # Worker fiscal in-process (F7): só sobe com FISCAL_FEATURE_ENABLED=true.
+    fiscal_worker.start(get_conn, put_conn)
+
+
+@app.on_event("shutdown")
+def shutdown():
+    fiscal_worker.stop()
 
 
 # -------------------------------------------------------------------------------------

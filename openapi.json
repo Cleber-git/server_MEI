@@ -646,15 +646,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/NfseRequest"
-                  },
-                  {
-                    "$ref": "#/components/schemas/ProductRequest"
-                  }
-                ],
-                "title": "Data"
+                "$ref": "#/components/schemas/CreateFiscalDocumentRequest"
               }
             }
           }
@@ -695,18 +687,7 @@
         ],
         "parameters": [
           {
-            "name": "page",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 1,
-              "title": "Page"
-            }
-          },
-          {
-            "name": "size",
+            "name": "limit",
             "in": "query",
             "required": false,
             "schema": {
@@ -714,7 +695,24 @@
               "maximum": 100,
               "minimum": 1,
               "default": 20,
-              "title": "Size"
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 512
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
             }
           },
           {
@@ -724,6 +722,11 @@
             "schema": {
               "anyOf": [
                 {
+                  "enum": [
+                    "NFSE",
+                    "NFCE_65",
+                    "NFE_55"
+                  ],
                   "type": "string"
                 },
                 {
@@ -740,7 +743,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string"
+                  "$ref": "#/components/schemas/FiscalStatus"
                 },
                 {
                   "type": "null"
@@ -750,35 +753,37 @@
             }
           },
           {
-            "name": "environment",
+            "name": "from",
             "in": "query",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "string"
+                  "type": "string",
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "title": "Environment"
+              "title": "From"
             }
           },
           {
-            "name": "saleId",
+            "name": "to",
             "in": "query",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "string"
+                  "type": "string",
+                  "format": "date-time"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "title": "Saleid"
+              "title": "To"
             }
           }
         ],
@@ -787,7 +792,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/FiscalDocumentPageDto"
+                }
               }
             }
           },
@@ -907,7 +914,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/FiscalDocumentDto"
+                }
               }
             }
           },
@@ -946,6 +955,22 @@
               "format": "uuid",
               "title": "Document Id"
             }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
           }
         ],
         "responses": {
@@ -953,7 +978,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/FiscalDocumentDto"
+                }
               }
             }
           },
@@ -970,13 +997,136 @@
         }
       }
     },
-    "/api/v1/fiscal/documents/{document_id}/auxiliary-document": {
+    "/api/v1/fiscal/documents/{document_id}/substitute": {
+      "post": {
+        "tags": [
+          "fiscal"
+        ],
+        "summary": "Substitute Document",
+        "description": "Substituição (só NFS-e, e só com provider que a suporte). Devolve o substituto.",
+        "operationId": "substitute_document_api_v1_fiscal_documents__document_id__substitute_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubstituteFiscalDocumentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FiscalDocumentDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/fiscal/documents/{document_id}/events": {
       "get": {
         "tags": [
           "fiscal"
         ],
-        "summary": "Get Artifact",
-        "operationId": "get_artifact_api_v1_fiscal_documents__document_id__auxiliary_document_get",
+        "summary": "Document Events",
+        "operationId": "document_events_api_v1_fiscal_documents__document_id__events_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FiscalEventPageDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/fiscal/documents/{document_id}/xml": {
+      "get": {
+        "tags": [
+          "fiscal"
+        ],
+        "summary": "Get Xml",
+        "operationId": "get_xml_api_v1_fiscal_documents__document_id__xml_get",
         "security": [
           {
             "HTTPBearer": []
@@ -1016,13 +1166,13 @@
         }
       }
     },
-    "/api/v1/fiscal/documents/{document_id}/xml": {
+    "/api/v1/fiscal/documents/{document_id}/auxiliary-document": {
       "get": {
         "tags": [
           "fiscal"
         ],
-        "summary": "Get Artifact",
-        "operationId": "get_artifact_api_v1_fiscal_documents__document_id__xml_get",
+        "summary": "Get Auxiliary Document",
+        "operationId": "get_auxiliary_document_api_v1_fiscal_documents__document_id__auxiliary_document_get",
         "security": [
           {
             "HTTPBearer": []
@@ -5225,6 +5375,114 @@
         ],
         "title": "ClienteIn"
       },
+      "CreateFiscalDocumentRequest": {
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "enum": [
+              "1.1",
+              "1.2",
+              "2.3"
+            ],
+            "title": "Schemaversion"
+          },
+          "documentType": {
+            "type": "string",
+            "enum": [
+              "NFSE",
+              "NFCE_65",
+              "NFE_55",
+              "OFFICIAL_NFF"
+            ],
+            "title": "Documenttype"
+          },
+          "environment": {
+            "$ref": "#/components/schemas/Environment"
+          },
+          "saleId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Saleid"
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LegacyProductOperation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "product": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProductFiscalIntent"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "service": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FiscalService"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recipient": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FiscalRecipient"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FiscalItem"
+            },
+            "type": "array",
+            "maxItems": 990,
+            "title": "Items"
+          },
+          "payments": {
+            "items": {
+              "$ref": "#/components/schemas/FiscalPayment"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Payments"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/FiscalTotals"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schemaVersion",
+          "documentType",
+          "environment",
+          "totals"
+        ],
+        "title": "CreateFiscalDocumentRequest",
+        "description": "Contrato 4.4: 1.2 = NFS-e, 1.1 = produto legado (só parse), 2.3 = produto roteado."
+      },
       "CscRequest": {
         "properties": {
           "cscId": {
@@ -6470,7 +6728,7 @@
           "number": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -6587,6 +6845,28 @@
           "attempt": {
             "type": "integer",
             "title": "Attempt"
+          },
+          "retryAfter": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retryafter"
+          },
+          "etag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etag"
           }
         },
         "type": "object",
@@ -6601,6 +6881,33 @@
           "attempt"
         ],
         "title": "FiscalDocumentDto"
+      },
+      "FiscalDocumentPageDto": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FiscalDocumentDto"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "FiscalDocumentPageDto"
       },
       "FiscalEstablishmentDto": {
         "properties": {
@@ -6884,6 +7191,444 @@
         "title": "FiscalEstablishmentUpdate",
         "description": "PUT /establishment. CNPJ vem do cadastro da empresa e não muda por aqui:\nse vier, precisa ser o mesmo. ``fiscalEnabled``/``missingFields`` são ignorados\n(somente leitura), para o app poder devolver o que recebeu no GET."
       },
+      "FiscalEventDto": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "fromStatus": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FiscalStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "toStatus": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FiscalStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Occurredat"
+          },
+          "correlationId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlationid"
+          },
+          "officialCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Officialcode"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "occurredAt"
+        ],
+        "title": "FiscalEventDto"
+      },
+      "FiscalEventPageDto": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FiscalEventDto"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "FiscalEventPageDto"
+      },
+      "FiscalItem": {
+        "properties": {
+          "productId": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Productid"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Description"
+          },
+          "gtin": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(SEM GTIN|\\d{8}|\\d{12,14})$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gtin"
+          },
+          "ncm": {
+            "type": "string",
+            "pattern": "^\\d{8}$",
+            "title": "Ncm"
+          },
+          "classification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProductClassification"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "productSource": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "OWN_PRODUCTION",
+                  "RESALE"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Productsource"
+          },
+          "cest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{7}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cest"
+          },
+          "cfop": {
+            "type": "string",
+            "pattern": "^\\d{4}$",
+            "title": "Cfop"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "UN",
+              "KG",
+              "L",
+              "M",
+              "PCT",
+              "CX"
+            ],
+            "title": "Unit"
+          },
+          "quantity": {
+            "type": "string",
+            "pattern": "^(0|[1-9]\\d{0,8})(\\.\\d{1,4})?$",
+            "title": "Quantity"
+          },
+          "unitPrice": {
+            "type": "string",
+            "pattern": "^(0|[1-9]\\d{0,12})(\\.\\d{1,10})?$",
+            "title": "Unitprice"
+          },
+          "grossAmount": {
+            "type": "string",
+            "pattern": "^(0|[1-9]\\d{0,12})\\.\\d{2}$",
+            "title": "Grossamount"
+          },
+          "discountAmount": {
+            "type": "string",
+            "pattern": "^(0|[1-9]\\d{0,12})\\.\\d{2}$",
+            "title": "Discountamount"
+          },
+          "netAmount": {
+            "type": "string",
+            "pattern": "^(0|[1-9]\\d{0,12})\\.\\d{2}$",
+            "title": "Netamount"
+          },
+          "origin": {
+            "type": "string",
+            "pattern": "^[0-8]$",
+            "title": "Origin"
+          },
+          "csosn": {
+            "type": "string",
+            "pattern": "^\\d{3}$",
+            "title": "Csosn"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "productId",
+          "description",
+          "ncm",
+          "cfop",
+          "unit",
+          "quantity",
+          "unitPrice",
+          "grossAmount",
+          "discountAmount",
+          "netAmount",
+          "origin",
+          "csosn"
+        ],
+        "title": "FiscalItem"
+      },
+      "FiscalPayment": {
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "CASH",
+              "CREDIT_CARD",
+              "DEBIT_CARD",
+              "PIX",
+              "STORE_CREDIT",
+              "FOOD_VOUCHER",
+              "MEAL_VOUCHER",
+              "OTHER"
+            ],
+            "title": "Method"
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^(0|[1-9]\\d{0,12})\\.\\d{2}$",
+            "title": "Amount"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "method",
+          "amount"
+        ],
+        "title": "FiscalPayment"
+      },
+      "FiscalRecipient": {
+        "properties": {
+          "taxId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9A-Za-z]{1,32}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Taxid"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "stateRegistration": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stateregistration"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 254
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "INDIVIDUAL",
+                  "LEGAL_ENTITY",
+                  "FOREIGN"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          },
+          "foreignTaxId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Foreigntaxid"
+          },
+          "countryCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Z]{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Countrycode"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "FiscalRecipient"
+      },
+      "FiscalService": {
+        "properties": {
+          "nationalTaxCode": {
+            "type": "string",
+            "pattern": "^\\d{6}$",
+            "title": "Nationaltaxcode"
+          },
+          "nbs": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{9}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nbs"
+          },
+          "emissionMode": {
+            "type": "string",
+            "enum": [
+              "SIMPLIFIED",
+              "COMPLETE",
+              "OFFICIAL_PORTAL",
+              "BLOCKED_REVIEW"
+            ],
+            "title": "Emissionmode"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Description"
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^(0|[1-9]\\d{0,12})\\.\\d{2}$",
+            "title": "Amount"
+          },
+          "withholdingResponsibility": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "RECIPIENT",
+                  "INTERMEDIARY"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withholdingresponsibility"
+          },
+          "incidenceMunicipalityCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{7}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incidencemunicipalitycode"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "nationalTaxCode",
+          "emissionMode",
+          "description",
+          "amount"
+        ],
+        "title": "FiscalService"
+      },
       "FiscalStatus": {
         "type": "string",
         "enum": [
@@ -6901,6 +7646,57 @@
           "ERROR_FINAL"
         ],
         "title": "FiscalStatus"
+      },
+      "FiscalTotals": {
+        "properties": {
+          "products": {
+            "type": "string",
+            "pattern": "^(0|[1-9]\\d{0,12})\\.\\d{2}$",
+            "title": "Products"
+          },
+          "discount": {
+            "type": "string",
+            "pattern": "^(0|[1-9]\\d{0,12})\\.\\d{2}$",
+            "title": "Discount"
+          },
+          "freight": {
+            "type": "string",
+            "pattern": "^(0|[1-9]\\d{0,12})\\.\\d{2}$",
+            "title": "Freight"
+          },
+          "other": {
+            "type": "string",
+            "pattern": "^(0|[1-9]\\d{0,12})\\.\\d{2}$",
+            "title": "Other"
+          },
+          "invoice": {
+            "type": "string",
+            "pattern": "^(0|[1-9]\\d{0,12})\\.\\d{2}$",
+            "title": "Invoice"
+          },
+          "paid": {
+            "type": "string",
+            "pattern": "^(0|[1-9]\\d{0,12})\\.\\d{2}$",
+            "title": "Paid"
+          },
+          "change": {
+            "type": "string",
+            "pattern": "^(0|[1-9]\\d{0,12})\\.\\d{2}$",
+            "title": "Change"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "products",
+          "discount",
+          "freight",
+          "other",
+          "invoice",
+          "paid",
+          "change"
+        ],
+        "title": "FiscalTotals"
       },
       "HTTPValidationError": {
         "properties": {
@@ -6952,6 +7748,56 @@
           "quantidade"
         ],
         "title": "ItemVendaIn"
+      },
+      "LegacyProductOperation": {
+        "properties": {
+          "consumerFinal": {
+            "type": "boolean",
+            "title": "Consumerfinal"
+          },
+          "presencial": {
+            "type": "boolean",
+            "title": "Presencial"
+          },
+          "interstate": {
+            "type": "boolean",
+            "title": "Interstate"
+          },
+          "recipientIsIcmsTaxpayer": {
+            "type": "boolean",
+            "title": "Recipientisicmstaxpayer"
+          },
+          "delivery": {
+            "type": "boolean",
+            "title": "Delivery"
+          },
+          "foreignTrade": {
+            "type": "boolean",
+            "title": "Foreigntrade"
+          },
+          "logistics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProductLogistics"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "consumerFinal",
+          "presencial",
+          "interstate",
+          "recipientIsIcmsTaxpayer",
+          "delivery",
+          "foreignTrade"
+        ],
+        "title": "LegacyProductOperation",
+        "description": "``ProductOperationDto`` (schema 1.1): o servidor só aceita parsear."
       },
       "LoginIn": {
         "properties": {
@@ -7027,150 +7873,6 @@
         "additionalProperties": false,
         "type": "object",
         "title": "LogoutRequest"
-      },
-      "NfseItem": {
-        "properties": {
-          "description": {
-            "type": "string",
-            "maxLength": 2000,
-            "minLength": 1,
-            "title": "Description"
-          },
-          "nationalServiceCode": {
-            "type": "string",
-            "maxLength": 20,
-            "minLength": 1,
-            "title": "Nationalservicecode"
-          },
-          "municipalTaxCode": {
-            "type": "string",
-            "maxLength": 30,
-            "minLength": 1,
-            "title": "Municipaltaxcode"
-          },
-          "nbs": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 20
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Nbs"
-          },
-          "incidenceCityCode": {
-            "type": "string",
-            "pattern": "^\\d{7}$",
-            "title": "Incidencecitycode"
-          },
-          "serviceCityCode": {
-            "type": "string",
-            "pattern": "^\\d{7}$",
-            "title": "Servicecitycode"
-          },
-          "amount": {
-            "type": "string",
-            "pattern": "^(0|[1-9]\\d{0,12})(\\.\\d{1,4})?$",
-            "title": "Amount"
-          },
-          "discount": {
-            "type": "string",
-            "pattern": "^(0|[1-9]\\d{0,12})(\\.\\d{1,4})?$",
-            "title": "Discount",
-            "default": "0.00"
-          },
-          "deductions": {
-            "type": "string",
-            "pattern": "^(0|[1-9]\\d{0,12})(\\.\\d{1,4})?$",
-            "title": "Deductions",
-            "default": "0.00"
-          },
-          "issWithheld": {
-            "type": "boolean",
-            "title": "Isswithheld",
-            "default": false
-          },
-          "additionalInformation": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2000
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Additionalinformation"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "description",
-          "nationalServiceCode",
-          "municipalTaxCode",
-          "incidenceCityCode",
-          "serviceCityCode",
-          "amount"
-        ],
-        "title": "NfseItem"
-      },
-      "NfseRequest": {
-        "properties": {
-          "schemaVersion": {
-            "type": "string",
-            "const": "1",
-            "title": "Schemaversion"
-          },
-          "documentType": {
-            "type": "string",
-            "const": "NFSE",
-            "title": "Documenttype"
-          },
-          "environment": {
-            "$ref": "#/components/schemas/Environment"
-          },
-          "saleId": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 100
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Saleid"
-          },
-          "recipient": {
-            "$ref": "#/components/schemas/Recipient"
-          },
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/NfseItem"
-            },
-            "type": "array",
-            "maxItems": 100,
-            "minItems": 1,
-            "title": "Items"
-          },
-          "totals": {
-            "$ref": "#/components/schemas/Totals"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "schemaVersion",
-          "documentType",
-          "environment",
-          "recipient",
-          "items",
-          "totals"
-        ],
-        "title": "NfseRequest"
       },
       "NotaServicoIn": {
         "properties": {
@@ -7397,28 +8099,6 @@
         ],
         "title": "PagamentoIn"
       },
-      "Payment": {
-        "properties": {
-          "method": {
-            "type": "string",
-            "maxLength": 2,
-            "minLength": 2,
-            "title": "Method"
-          },
-          "amount": {
-            "type": "string",
-            "pattern": "^(0|[1-9]\\d{0,12})(\\.\\d{1,4})?$",
-            "title": "Amount"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "method",
-          "amount"
-        ],
-        "title": "Payment"
-      },
       "PaymentIn": {
         "properties": {
           "status": {
@@ -7503,6 +8183,119 @@
         ],
         "title": "PerfilIn"
       },
+      "ProductClassification": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "PURCHASE_XML",
+              "OFFICIAL_SEARCH",
+              "USER_CONFIRMED",
+              "PROFESSIONAL_REVIEW"
+            ],
+            "title": "Source"
+          },
+          "tableVersion": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Tableversion"
+          },
+          "tablePublishedAt": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Tablepublishedat"
+          },
+          "confirmedAt": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Confirmedat"
+          },
+          "validUntil": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validuntil"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source",
+          "tableVersion",
+          "tablePublishedAt",
+          "confirmedAt"
+        ],
+        "title": "ProductClassification"
+      },
+      "ProductFiscalIntent": {
+        "properties": {
+          "contractVersion": {
+            "type": "string",
+            "const": "2.3",
+            "title": "Contractversion"
+          },
+          "route": {
+            "$ref": "#/components/schemas/ProductRoute"
+          },
+          "operation": {
+            "$ref": "#/components/schemas/EvaluationOperation"
+          },
+          "recipient": {
+            "$ref": "#/components/schemas/EvaluationRecipient"
+          },
+          "logistics": {
+            "$ref": "#/components/schemas/ProductLogistics"
+          },
+          "paymentExpectation": {
+            "type": "string",
+            "enum": [
+              "PAID",
+              "NO_PAYMENT"
+            ],
+            "title": "Paymentexpectation"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FiscalItem"
+            },
+            "type": "array",
+            "maxItems": 990,
+            "minItems": 1,
+            "title": "Items"
+          },
+          "payments": {
+            "items": {
+              "$ref": "#/components/schemas/FiscalPayment"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Payments"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/FiscalTotals"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "contractVersion",
+          "route",
+          "operation",
+          "recipient",
+          "logistics",
+          "paymentExpectation",
+          "items",
+          "totals"
+        ],
+        "title": "ProductFiscalIntent"
+      },
       "ProductIn": {
         "properties": {
           "nome": {
@@ -7542,208 +8335,77 @@
         ],
         "title": "ProductIn"
       },
-      "ProductItem": {
+      "ProductLogistics": {
         "properties": {
-          "description": {
+          "mode": {
             "type": "string",
-            "maxLength": 120,
-            "minLength": 1,
-            "title": "Description"
-          },
-          "ncm": {
-            "type": "string",
-            "pattern": "^\\d{8}$",
-            "title": "Ncm"
-          },
-          "cest": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^\\d{7}$"
-              },
-              {
-                "type": "null"
-              }
+            "enum": [
+              "NO_TRANSPORT",
+              "CUSTOMER_PICKUP",
+              "DELIVERY"
             ],
-            "title": "Cest"
+            "title": "Mode"
           },
-          "cfop": {
+          "transportMode": {
             "type": "string",
-            "pattern": "^[1256]\\d{3}$",
-            "title": "Cfop"
-          },
-          "origin": {
-            "type": "integer",
-            "maximum": 8.0,
-            "minimum": 0.0,
-            "title": "Origin"
-          },
-          "csosn": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^\\d{3}$"
-              },
-              {
-                "type": "null"
-              }
+            "enum": [
+              "NONE",
+              "SELLER_CONTRACTED",
+              "RECIPIENT_CONTRACTED",
+              "SELLER_OWN",
+              "RECIPIENT_OWN"
             ],
-            "title": "Csosn"
-          },
-          "cst": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^\\d{2}$"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cst"
-          },
-          "commercialUnit": {
-            "type": "string",
-            "maxLength": 6,
-            "minLength": 1,
-            "title": "Commercialunit"
-          },
-          "taxableUnit": {
-            "type": "string",
-            "maxLength": 6,
-            "minLength": 1,
-            "title": "Taxableunit"
-          },
-          "gtin": {
-            "type": "string",
-            "pattern": "^(SEM GTIN|\\d{8}|\\d{12,14})$",
-            "title": "Gtin"
-          },
-          "quantity": {
-            "type": "string",
-            "pattern": "^(0|[1-9]\\d{0,12})(\\.\\d{1,4})?$",
-            "title": "Quantity"
-          },
-          "unitPrice": {
-            "type": "string",
-            "pattern": "^(0|[1-9]\\d{0,12})(\\.\\d{1,4})?$",
-            "title": "Unitprice"
-          },
-          "total": {
-            "type": "string",
-            "pattern": "^(0|[1-9]\\d{0,12})(\\.\\d{1,4})?$",
-            "title": "Total"
+            "title": "Transportmode"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "description",
-          "ncm",
-          "cfop",
-          "origin",
-          "commercialUnit",
-          "taxableUnit",
-          "gtin",
-          "quantity",
-          "unitPrice",
-          "total"
+          "mode",
+          "transportMode"
         ],
-        "title": "ProductItem"
+        "title": "ProductLogistics"
       },
-      "ProductRequest": {
+      "ProductRoute": {
         "properties": {
-          "schemaVersion": {
-            "type": "string",
-            "const": "1",
-            "title": "Schemaversion"
-          },
-          "documentType": {
+          "document": {
             "type": "string",
             "enum": [
+              "NFSE",
               "NFCE_65",
-              "NFE_55"
+              "NFE_55",
+              "OFFICIAL_NFF"
             ],
-            "title": "Documenttype"
+            "title": "Document"
           },
-          "environment": {
-            "$ref": "#/components/schemas/Environment"
-          },
-          "saleId": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 100
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Saleid"
-          },
-          "operationNature": {
+          "reason": {
             "type": "string",
             "maxLength": 60,
             "minLength": 1,
-            "title": "Operationnature"
+            "title": "Reason"
           },
-          "purpose": {
-            "type": "integer",
-            "maximum": 4.0,
-            "minimum": 1.0,
-            "title": "Purpose"
+          "capabilityId": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Capabilityid"
           },
-          "presenceIndicator": {
-            "type": "integer",
-            "maximum": 9.0,
-            "minimum": 0.0,
-            "title": "Presenceindicator"
-          },
-          "finalConsumer": {
-            "type": "boolean",
-            "title": "Finalconsumer"
-          },
-          "recipient": {
-            "$ref": "#/components/schemas/Recipient"
-          },
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/ProductItem"
-            },
-            "type": "array",
-            "maxItems": 990,
-            "minItems": 1,
-            "title": "Items"
-          },
-          "totals": {
-            "$ref": "#/components/schemas/Totals"
-          },
-          "payments": {
-            "items": {
-              "$ref": "#/components/schemas/Payment"
-            },
-            "type": "array",
-            "maxItems": 20,
-            "minItems": 1,
-            "title": "Payments"
+          "capabilityVersion": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Capabilityversion"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "schemaVersion",
-          "documentType",
-          "environment",
-          "operationNature",
-          "purpose",
-          "presenceIndicator",
-          "finalConsumer",
-          "recipient",
-          "items",
-          "totals",
-          "payments"
+          "document",
+          "reason",
+          "capabilityId",
+          "capabilityVersion"
         ],
-        "title": "ProductRequest"
+        "title": "ProductRoute"
       },
       "ProductSale": {
         "properties": {
@@ -7818,76 +8480,6 @@
           "quantidade"
         ],
         "title": "ProductSaleItem"
-      },
-      "Recipient": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Name"
-          },
-          "taxId": {
-            "type": "string",
-            "maxLength": 32,
-            "minLength": 11,
-            "title": "Taxid"
-          },
-          "email": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 254
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Email"
-          },
-          "ibgeCityCode": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^\\d{7}$"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Ibgecitycode"
-          },
-          "uf": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^[A-Z]{2}$"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Uf"
-          },
-          "stateRegistrationIndicator": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Stateregistrationindicator"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "name",
-          "taxId"
-        ],
-        "title": "Recipient"
       },
       "RefreshRequest": {
         "properties": {
@@ -8052,6 +8644,26 @@
         ],
         "title": "SetupIn"
       },
+      "SubstituteFiscalDocumentRequest": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 15,
+            "title": "Reason"
+          },
+          "replacement": {
+            "$ref": "#/components/schemas/CreateFiscalDocumentRequest"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason",
+          "replacement"
+        ],
+        "title": "SubstituteFiscalDocumentRequest"
+      },
       "SupplierIn": {
         "properties": {
           "nome": {
@@ -8178,51 +8790,6 @@
           "documento"
         ],
         "title": "TomadorNotaServico"
-      },
-      "Totals": {
-        "properties": {
-          "items": {
-            "type": "string",
-            "pattern": "^(0|[1-9]\\d{0,12})(\\.\\d{1,4})?$",
-            "title": "Items"
-          },
-          "discount": {
-            "type": "string",
-            "pattern": "^(0|[1-9]\\d{0,12})(\\.\\d{1,4})?$",
-            "title": "Discount",
-            "default": "0.00"
-          },
-          "freight": {
-            "type": "string",
-            "pattern": "^(0|[1-9]\\d{0,12})(\\.\\d{1,4})?$",
-            "title": "Freight",
-            "default": "0.00"
-          },
-          "insurance": {
-            "type": "string",
-            "pattern": "^(0|[1-9]\\d{0,12})(\\.\\d{1,4})?$",
-            "title": "Insurance",
-            "default": "0.00"
-          },
-          "other": {
-            "type": "string",
-            "pattern": "^(0|[1-9]\\d{0,12})(\\.\\d{1,4})?$",
-            "title": "Other",
-            "default": "0.00"
-          },
-          "total": {
-            "type": "string",
-            "pattern": "^(0|[1-9]\\d{0,12})(\\.\\d{1,4})?$",
-            "title": "Total"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "items",
-          "total"
-        ],
-        "title": "Totals"
       },
       "Usuario": {
         "properties": {

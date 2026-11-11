@@ -1,11 +1,12 @@
 import os
-from psycopg2.pool import SimpleConnectionPool
+# Thread-safe: o FastAPI roda rotas síncronas em threads e o worker fiscal (F7) é outra.
+from psycopg2.pool import ThreadedConnectionPool
 
 DB_POOL = None
 
 def create_pool():
     global DB_POOL
-    DB_POOL = SimpleConnectionPool(
+    DB_POOL = ThreadedConnectionPool(
         minconn=1,
         maxconn=10,
         dbname=os.getenv("DB_NAME"),

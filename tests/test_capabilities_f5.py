@@ -11,7 +11,6 @@ from uuid import UUID, uuid4
 import psycopg2
 import pytest
 
-import fiscal.api as fiscal_api
 import fiscal.capabilities as caps_mod
 from fiscal.capabilities import is_safe_gov_url
 from fiscal.establishment import valid_cnpj, valid_cpf
@@ -149,8 +148,10 @@ def _add_certificate(db, tenant="tenant-a", *, expires_in=timedelta(days=300)):
     now = datetime.now(timezone.utc)
     db.cursor().execute(
         """INSERT INTO fiscal_certificates (id,tenant_id,establishment_id,vault_reference,
-           fingerprint,serial_number,holder_masked,issuer,valid_from,expires_at,type,status)
-           VALUES (%s,%s,%s,'ref',%s,'1','***','AC',%s,%s,'A1','ACTIVE')""",
+           fingerprint,serial_number,holder_masked,issuer,valid_from,expires_at,type,status,
+           holder_tax_id,holder_kind)
+           VALUES (%s,%s,%s,'ref',%s,'1','***','AC',%s,%s,'A1','ACTIVE',
+                   (SELECT cnpj FROM empresa WHERE uuid=%s),'CNPJ')""",
         (
             uuid4(),
             tenant,
@@ -158,6 +159,7 @@ def _add_certificate(db, tenant="tenant-a", *, expires_in=timedelta(days=300)):
             "f" * 64,
             now - timedelta(days=1),
             now + expires_in,
+            tenant,
         ),
     )
     db.commit()
@@ -874,5 +876,9 @@ def test_new_routes_are_tenant_isolated(db, client, fiscal_on):
     assert b["fiscalEnabled"] is False
 
 
-def test_api_module_keeps_provider_unavailable():
-    assert fiscal_api.provider.reason
+def test_default_provider_never_transmits():
+    from fiscal import providers
+
+    provider = providers.provider_for("NFSE")
+    assert isinstance(provider, providers.UnavailableProvider)
+    assert provider.submit(None).kind == providers.OutcomeKind.NOT_SENT

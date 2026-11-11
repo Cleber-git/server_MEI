@@ -25,11 +25,13 @@ class Settings:
     production_enabled: bool = _bool("FISCAL_PRODUCTION_ENABLED")
     max_upload_bytes: int = int(os.getenv("FISCAL_MAX_UPLOAD_BYTES", "65536"))
     job_max_attempts: int = int(os.getenv("FISCAL_JOB_MAX_ATTEMPTS", "8"))
-    artifact_root: str = os.getenv("FISCAL_ARTIFACT_ROOT", "")
     vault_provider: str = os.getenv("VAULT_PROVIDER", "disabled")
-    kms_key_reference: str = os.getenv("KMS_KEY_REFERENCE", "")
-    # Até a F7 só o payload de /documents ainda usa esta chave Fernet.
-    local_vault_key: str = os.getenv("FISCAL_LOCAL_VAULT_KEY", "")
+    # Provider dos documentos (F7): "unavailable" (padrão, nunca transmite) ou "fake"
+    # (autorizador em memória, só para backend local/testes; recusa produção).
+    fiscal_provider: str = os.getenv("FISCAL_PROVIDER", "unavailable").strip().lower()
+    # Worker in-process (F7): sobe no startup quando o fiscal está ligado.
+    worker_enabled: bool = _bool("FISCAL_WORKER_ENABLED", True)
+    worker_poll_seconds: float = float(os.getenv("FISCAL_WORKER_POLL_SECONDS", "2"))
     # Cofre (F4): "kid:base64(32 bytes)[,kid:base64…]" e o kid ativo.
     vault_master_keys: str = os.getenv("FISCAL_VAULT_MASTER_KEY", "")
     vault_active_key_id: str = os.getenv("FISCAL_VAULT_ACTIVE_KEY_ID", "")
@@ -93,6 +95,12 @@ def assert_startup_ready(current: Settings | None = None) -> None:
         raise RuntimeError(
             "FISCAL_FEATURE_ENABLED=true exige JWT_ACTIVE_KID igual a um kid de "
             "JWT_SIGNING_KEYS"
+        )
+    if current.fiscal_provider not in ("unavailable", "fake"):
+        raise RuntimeError("FISCAL_PROVIDER aceita só unavailable ou fake nesta versão")
+    if current.fiscal_provider == "fake" and current.production_enabled:
+        raise RuntimeError(
+            "FISCAL_PROVIDER=fake não pode rodar com FISCAL_PRODUCTION_ENABLED=true"
         )
     vault_keys, vault_active = current.vault_keyring()
     if not vault_keys or vault_active not in vault_keys:

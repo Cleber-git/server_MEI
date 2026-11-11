@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Literal
 from uuid import UUID, uuid4
 
-from cryptography.fernet import Fernet
 from fastapi import (
     APIRouter,
     Body,
@@ -22,11 +22,9 @@ from psycopg2.extras import Json
 from db import get_conn, put_conn
 from .auth import Principal, require_permission
 from .config import settings
-from .domain import DocumentType, Environment, canonical_hash, canonical_json
+from .domain import DocumentType, Environment, FiscalStatus, canonical_hash
 from .errors import ApiProblem
-from .interfaces import UnavailableProvider
-from .queue import PostgresFiscalJobQueue
-from . import capabilities, establishment, vault
+from . import capabilities, documents, establishment, providers, vault
 from .schemas import (
     CancelFiscalDocumentRequest,
     CapabilityEvaluationDto,
@@ -40,13 +38,14 @@ from .schemas import (
     FiscalConfigDto,
     FiscalConfigUpdate,
     FiscalDocumentDto,
+    FiscalDocumentPageDto,
     FiscalEstablishmentDto,
     FiscalEstablishmentUpdate,
+    FiscalEventPageDto,
+    SubstituteFiscalDocumentRequest,
 )
 
 router = APIRouter(prefix="/api/v1/fiscal", tags=["fiscal"])
-provider = UnavailableProvider()
-queue = PostgresFiscalJobQueue()
 
 
 def _establishment(cur, tenant_id):
@@ -106,34 +105,6 @@ def _audit(
             Json(metadata or {}),
         ),
     )
-
-
-def _document(row):
-    return FiscalDocumentDto(
-        id=row[0],
-        documentType=row[1],
-        environment=row[2],
-        status=row[3],
-        series=row[4],
-        number=row[5],
-        officialKey=row[6],
-        protocol=row[7],
-        authorizedAt=row[8],
-        createdAt=row[9],
-        updatedAt=row[10],
-        fiscalErrorCode=row[11],
-        fiscalErrorMessage=row[12],
-        xmlSha256=row[13],
-        xmlArtifactId=row[14],
-        auxiliaryArtifactId=row[15],
-        correlationId=row[16],
-        attempt=row[17],
-    )
-
-
-DOC_SELECT = """SELECT d.id,d.document_type,d.environment,d.status,d.series,d.number,d.official_key,d.protocol,d.authorized_at,
- d.created_at,d.updated_at,d.fiscal_error_code,d.fiscal_error_message,a.sha256,d.xml_artifact_id,d.auxiliary_artifact_id,d.correlation_id,d.attempt
- FROM fiscal_documents d LEFT JOIN fiscal_artifacts a ON a.id=d.xml_artifact_id"""
 
 
 @router.get("/config", response_model=FiscalConfigDto)
@@ -324,6 +295,57 @@ def get_capabilities(
         put_conn(conn)
 
 
+def _certificate_ready(cur, tenant_id, establishment_id, now) -> bool:
+    """Certificado ativo, na validade e do titular do cadastro (CNPJ ou CPF do MEI).
+
+    Um certificado de outro titular (por exemplo, depois de trocar o CNPJ da empresa)
+    não conta: a emissão fica bloqueada até um novo envio.
+    """
+    cur.execute(
+        """SELECT EXISTS(SELECT 1 FROM fiscal_certificates c
+             JOIN fiscal_establishments fe ON fe.id=c.establishment_id AND fe.tenant_id=c.tenant_id
+             WHERE c.tenant_id=%s AND c.establishment_id=%s AND c.status='ACTIVE'
+               AND c.valid_from<=%s AND c.expires_at>%s AND c.holder_tax_id IS NOT NULL
+               AND (c.holder_tax_id=regexp_replace(upper(fe.cnpj),'[^0-9A-Z]','','g')
+                    OR c.holder_tax_id=fe.responsible_cpf))""",
+        (tenant_id, establishment_id, now, now),
+    )
+    return bool(cur.fetchone()[0])
+
+
+def _evaluation_context(cur, tenant_id, info, est, configured) -> capabilities.Context:
+    now = capabilities.now_utc()
+    uf = info["uf"] if info else None
+    caps, approved, cert_ok, csc_ok = {}, set(), False, False
+    if est and uf:
+        caps = capabilities.current(cur, uf, configured, now)
+        approved = capabilities.homologated(cur, tenant_id, est[0], uf)
+        cert_ok = _certificate_ready(cur, tenant_id, est[0], now)
+        cur.execute(
+            """SELECT EXISTS(SELECT 1 FROM fiscal_credentials WHERE tenant_id=%s
+               AND establishment_id=%s AND credential_type=%s AND status='ACTIVE')""",
+            (tenant_id, est[0], vault.CSC_CREDENTIAL),
+        )
+        csc_ok = cur.fetchone()[0]
+    return capabilities.Context(
+        tenant_id=tenant_id,
+        establishment_uf=uf,
+        missing=establishment.missing_fields(info)
+        if info
+        else {
+            kind: ["establishment"]
+            for kind in (DocumentType.NFSE, DocumentType.NFCE_65, DocumentType.NFE_55)
+        },
+        environment=configured,
+        caps=caps,
+        approved=approved,
+        certificate_valid=bool(cert_ok),
+        csc_configured=bool(csc_ok),
+        production_effective=bool(est) and _production_effective(est),
+        now=now,
+    )
+
+
 @router.post("/capabilities/evaluate", response_model=CapabilityEvaluationDto)
 def evaluate_capability(
     data: EvaluateRequest,
@@ -333,7 +355,6 @@ def evaluate_capability(
     conn = get_conn()
     try:
         cur = conn.cursor()
-        now = capabilities.now_utc()
         info = establishment.load(cur, principal.tenant_id)
         est = _establishment(cur, principal.tenant_id) if info else None
         configured = (
@@ -362,45 +383,8 @@ def evaluate_capability(
                 "PRODUCTION_NOT_ENABLED",
                 "A produção ainda não foi liberada para esta empresa.",
             )
-        uf = info["uf"] if info else None
-        caps, approved, cert_ok, csc_ok = {}, set(), False, False
-        if est and uf:
-            caps = capabilities.current(cur, uf, configured, now)
-            approved = capabilities.homologated(cur, principal.tenant_id, est[0], uf)
-            cur.execute(
-                """SELECT EXISTS(SELECT 1 FROM fiscal_certificates WHERE tenant_id=%s
-                   AND establishment_id=%s AND status='ACTIVE' AND valid_from<=%s AND expires_at>%s)""",
-                (principal.tenant_id, est[0], now, now),
-            )
-            cert_ok = cur.fetchone()[0]
-            cur.execute(
-                """SELECT EXISTS(SELECT 1 FROM fiscal_credentials WHERE tenant_id=%s
-                   AND establishment_id=%s AND credential_type=%s AND status='ACTIVE')""",
-                (principal.tenant_id, est[0], vault.CSC_CREDENTIAL),
-            )
-            csc_ok = cur.fetchone()[0]
+        ctx = _evaluation_context(cur, principal.tenant_id, info, est, configured)
         conn.rollback()
-        ctx = capabilities.Context(
-            tenant_id=principal.tenant_id,
-            establishment_uf=uf,
-            missing=establishment.missing_fields(info)
-            if info
-            else {
-                kind: ["establishment"]
-                for kind in (
-                    DocumentType.NFSE,
-                    DocumentType.NFCE_65,
-                    DocumentType.NFE_55,
-                )
-            },
-            environment=configured,
-            caps=caps,
-            approved=approved,
-            certificate_valid=bool(cert_ok),
-            csc_configured=bool(csc_ok),
-            production_effective=bool(est) and _production_effective(est),
-            now=now,
-        )
         if is_service:
             return capabilities.evaluate_service(ctx, data)
         return capabilities.evaluate_product(ctx, data)
@@ -642,6 +626,241 @@ def put_csc(
     return Response(status_code=204)
 
 
+# --- Documentos (contrato 4.4, F7) -------------------------------------------------
+
+S = FiscalStatus
+_PRODUCTION_DENIED = (
+    403,
+    "PRODUCTION_NOT_ENABLED",
+    "A produção ainda não foi liberada para esta empresa.",
+)
+
+
+def _unavailable(reasons, message="A emissão automática não está disponível."):
+    return ApiProblem(422, "CAPABILITY_UNAVAILABLE", message, reasons=reasons)
+
+
+def _require_fiscal_enabled():
+    if not settings.fiscal_enabled:
+        raise ApiProblem(
+            503, "FISCAL_DISABLED", "A emissão fiscal está desligada no servidor."
+        )
+
+
+def _gate_document(cur, principal, data: CreateFiscalDocumentRequest, est) -> None:
+    """Recusa tudo que não pode virar documento. Nada é gravado antes daqui."""
+    if data.documentType == "OFFICIAL_NFF":
+        raise _unavailable(
+            ["OFFICIAL_CHANNEL"],
+            "A NFF é emitida no aplicativo oficial, não por este servidor.",
+        )
+    _require_fiscal_enabled()
+    is_service = data.documentType == "NFSE"
+    configured = _environment_for(est, "NFSE" if is_service else "NFE_55")
+    if data.environment == Environment.PRODUCTION and not _production_effective(est):
+        raise ApiProblem(*_PRODUCTION_DENIED)
+    if data.environment.value != configured:
+        raise ApiProblem(
+            422,
+            "VALIDATION_FAILED",
+            "O ambiente não é o configurado para esta empresa.",
+            field_errors=[{"path": "environment", "code": "ENVIRONMENT_MISMATCH"}],
+        )
+    if data.schemaVersion == "1.1":
+        raise ApiProblem(
+            422,
+            "FISCAL_OPERATION_INCOMPLETE",
+            "Atualize o aplicativo para emitir notas de produto.",
+            reasons=["PRODUCT_INTENT_V2_REQUIRED"],
+        )
+    if is_service:
+        documents.check_service_totals(data)
+    else:
+        intent = data.product
+        missing = []
+        if any(i.productSource is None for i in intent.items):
+            missing.append("ITEM_SOURCE_REQUIRED")
+        if any(i.classification is None or i.gtin is None for i in intent.items):
+            missing.append("ITEM_CLASSIFICATION_REQUIRED")
+        if intent.operation.purpose == "SALE" and intent.paymentExpectation != "PAID":
+            missing.append("SALE_REQUIRES_PAYMENT")
+        if missing:
+            raise ApiProblem(
+                422,
+                "FISCAL_OPERATION_INCOMPLETE",
+                "Faltam dados fiscais para emitir esta nota.",
+                reasons=missing,
+            )
+        documents.check_product_totals(intent)
+    info = establishment.load(cur, principal.tenant_id)
+    ctx = _evaluation_context(cur, principal.tenant_id, info, est, configured)
+    if is_service:
+        result = capabilities.evaluate_service(ctx, data)
+        expected = "NFSE_AUTOMATIC"
+    else:
+        result = capabilities.evaluate_product(ctx, data.product)
+        expected = data.documentType
+    decision, reasons = result["decision"], result["reasons"]
+    if decision == expected and (
+        is_service or result["capabilityId"] == data.product.route.capabilityId
+    ):
+        return
+    if decision == "REQUIRES_FISCAL_REVIEW":
+        raise ApiProblem(
+            422,
+            "FISCAL_OPERATION_INCOMPLETE",
+            "Esta operação precisa de revisão fiscal antes da emissão.",
+            reasons=reasons,
+        )
+    if "ESTABLISHMENT_INCOMPLETE" in reasons:
+        raise ApiProblem(
+            422,
+            "ESTABLISHMENT_INCOMPLETE",
+            "Complete o cadastro fiscal da empresa.",
+            reasons=reasons,
+        )
+    if decision == expected:
+        raise _unavailable(["CAPABILITY_ROUTE_MISMATCH"])
+    raise _unavailable(reasons)
+
+
+def _replayed(cur, tenant_id, existing, digest):
+    resource_id = documents.replay(existing, digest)
+    doc = documents.load(cur, tenant_id, resource_id) if resource_id else None
+    if doc is None:
+        raise documents.not_found()
+    return doc
+
+
+def _conflict_after_insert(cur, tenant_id, est_id, key, data, digest, substitutes):
+    """O INSERT do documento bateu num índice único: diz qual regra foi violada."""
+    cur.execute(
+        """SELECT 1 FROM fiscal_documents WHERE tenant_id=%s AND establishment_id=%s
+           AND idempotency_key=%s""",
+        (tenant_id, est_id, key),
+    )
+    if cur.fetchone():
+        raise ApiProblem(
+            409,
+            "IDEMPOTENCY_KEY_REUSED",
+            "Esta Idempotency-Key já foi usada com outro conteúdo.",
+        )
+    if substitutes:
+        raise ApiProblem(
+            409,
+            "INVALID_STATE_TRANSITION",
+            "Já existe uma substituição em andamento para este documento.",
+        )
+    existing = _duplicate_intent(cur, tenant_id, data, digest)
+    raise _duplicate_problem(existing)
+
+
+def _duplicate_intent(cur, tenant_id, data, digest):
+    if not data.saleId:
+        return None
+    cur.execute(
+        """SELECT id FROM fiscal_documents WHERE tenant_id=%s AND sale_id=%s
+           AND document_type=%s AND canonical_request_hash=%s
+           AND status NOT IN ('REJECTED','ERROR_FINAL') LIMIT 1""",
+        (tenant_id, data.saleId, data.documentType, digest),
+    )
+    row = cur.fetchone()
+    return str(row[0]) if row else None
+
+
+def _duplicate_problem(existing_id):
+    return ApiProblem(
+        409,
+        "DUPLICATE_FISCAL_INTENT",
+        "Esta venda já tem um documento fiscal com o mesmo conteúdo.",
+        reasons=[existing_id] if existing_id else [],
+    )
+
+
+def _create(
+    cur,
+    principal,
+    data: CreateFiscalDocumentRequest,
+    key: str,
+    correlation_id: str,
+    *,
+    operation=documents.OP_CREATE,
+    command_digest: str | None = None,
+    substitutes: documents.Doc | None = None,
+    extra_payload: dict | None = None,
+):
+    """Valida, reserva número e grava documento + idempotência + job numa transação.
+
+    Devolve ``(doc, created)``; ``created=False`` é a repetição idempotente."""
+    tenant = principal.tenant_id
+    payload = data.model_dump(mode="json", exclude_none=True)
+    digest = canonical_hash(payload)
+    command_digest = command_digest or digest
+    est = _establishment(cur, tenant)
+    existing = documents.find_idempotency(cur, tenant, est[0], operation, key)
+    if existing:
+        return _replayed(cur, tenant, existing, command_digest), False
+    _gate_document(cur, principal, data, est)
+    duplicate = _duplicate_intent(cur, tenant, data, digest)
+    if duplicate:
+        raise _duplicate_problem(duplicate)
+    ring = vault.keyring()
+    document_id = str(uuid4())
+    raced = documents.claim_idempotency(
+        cur, tenant, est[0], operation, key, command_digest, document_id
+    )
+    if raced is not None:
+        return _replayed(cur, tenant, raced, command_digest), False
+    series, number = documents.reserve_number(
+        cur, tenant, est[0], data.documentType, data.environment.value
+    )
+    blob = documents.seal_json(cur, tenant, {**payload, **(extra_payload or {})}, ring)
+    cur.execute(
+        """INSERT INTO fiscal_documents(id,tenant_id,establishment_id,idempotency_key,
+             canonical_request_hash,schema_version,sale_id,document_type,environment,status,
+             series,number,correlation_id,payload_blob_id,substitutes_document_id)
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,'VALIDATING',%s,%s,%s,%s,%s)
+           ON CONFLICT DO NOTHING RETURNING id""",
+        (
+            document_id,
+            tenant,
+            est[0],
+            key,
+            digest,
+            data.schemaVersion,
+            data.saleId,
+            data.documentType,
+            data.environment.value,
+            series,
+            number,
+            correlation_id,
+            blob,
+            substitutes.id if substitutes else None,
+        ),
+    )
+    if cur.fetchone() is None:
+        _conflict_after_insert(cur, tenant, est[0], key, data, digest, substitutes)
+    doc = documents.load(cur, tenant, document_id, for_update=True)
+    documents.record_event(cur, doc, "CREATED", None, S.VALIDATING, correlation_id)
+    doc = documents.transition(
+        cur, doc, S.QUEUED, event="QUEUED", correlation_id=correlation_id
+    )
+    documents.enqueue(
+        cur, tenant, document_id, "SUBMIT", correlation_id, settings.job_max_attempts
+    )
+    _audit(
+        cur,
+        principal,
+        "FISCAL_DOCUMENT_CREATE",
+        "document",
+        document_id,
+        correlation_id,
+        "ACCEPTED",
+        {"documentType": data.documentType, "substitution": bool(substitutes)},
+    )
+    return documents.load(cur, tenant, document_id), True
+
+
 @router.post("/documents", response_model=FiscalDocumentDto, status_code=202)
 def create_document(
     request: Request,
@@ -649,118 +868,13 @@ def create_document(
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     principal: Principal = Depends(require_permission("FISCAL_DOCUMENT_CREATE")),
 ):
-    if not idempotency_key or not idempotency_key.strip() or len(idempotency_key) > 200:
-        raise ApiProblem(
-            400,
-            "IDEMPOTENCY_KEY_REQUIRED",
-            "Informe Idempotency-Key imprevisível e não vazio",
-        )
-    payload = data.model_dump(mode="json")
-    digest = canonical_hash(payload)
+    key = documents.check_idempotency_key(idempotency_key)
     conn = get_conn()
     try:
         cur = conn.cursor()
-        est = _establishment(cur, principal.tenant_id)
-        if data.environment == Environment.PRODUCTION:
-            raise ApiProblem(
-                409,
-                "PRODUCTION_DISABLED",
-                "Produção não foi habilitada pelos gates do servidor",
-            )
-        if not settings.fiscal_enabled or not est[3]:
-            raise ApiProblem(409, "CAPABILITY_NOT_AVAILABLE", provider.reason)
-        if not settings.local_vault_key or not settings.kms_key_reference:
-            raise ApiProblem(
-                409,
-                "FISCAL_CONFIGURATION_INCOMPLETE",
-                "Cofre/KMS para payload fiscal não configurado",
-            )
-        cur.execute(
-            """SELECT canonical_payload_hash,resource_id FROM fiscal_idempotency
-          WHERE tenant_id=%s AND establishment_id=%s AND operation='CREATE_DOCUMENT' AND idempotency_key=%s FOR UPDATE""",
-            (principal.tenant_id, est[0], idempotency_key),
-        )
-        idem = cur.fetchone()
-        if idem:
-            if idem[0] != digest:
-                raise ApiProblem(
-                    409,
-                    "IDEMPOTENCY_KEY_REUSED",
-                    "A chave já foi usada com outro payload",
-                )
-            cur.execute(
-                DOC_SELECT + " WHERE d.tenant_id=%s AND d.id=%s",
-                (principal.tenant_id, idem[1]),
-            )
-            return _document(cur.fetchone())
-        document_id, correlation_id, now = (
-            uuid4(),
-            UUID(request.state.correlation_id),
-            datetime.now(timezone.utc),
-        )
-        cur.execute(
-            """INSERT INTO fiscal_idempotency(tenant_id,establishment_id,operation,idempotency_key,canonical_payload_hash,resource_id,status,expires_at)
-          VALUES(%s,%s,'CREATE_DOCUMENT',%s,%s,%s,'PROCESSING',NOW()+INTERVAL '90 days')""",
-            (principal.tenant_id, est[0], idempotency_key, digest, document_id),
-        )
-        cur.execute(
-            """INSERT INTO fiscal_documents(id,tenant_id,establishment_id,idempotency_key,canonical_request_hash,schema_version,sale_id,
-          document_type,environment,status,correlation_id,created_at,updated_at) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,'VALIDATING',%s,%s,%s)""",
-            (
-                document_id,
-                principal.tenant_id,
-                est[0],
-                idempotency_key,
-                digest,
-                data.schemaVersion,
-                data.saleId,
-                data.documentType.value,
-                data.environment.value,
-                correlation_id,
-                now,
-                now,
-            ),
-        )
-        try:
-            encrypted_payload = Fernet(
-                settings.local_vault_key.encode("ascii")
-            ).encrypt(canonical_json(payload))
-        except ValueError as exc:
-            raise ApiProblem(
-                409, "FISCAL_CONFIGURATION_INCOMPLETE", "Chave do cofre fiscal inválida"
-            ) from exc
-        cur.execute(
-            """INSERT INTO fiscal_document_payloads(document_id,tenant_id,canonical_request_ciphertext,
-              encryption_key_reference,retention_until) VALUES(%s,%s,%s,%s,CURRENT_DATE+INTERVAL '5 years')""",
-            (
-                document_id,
-                principal.tenant_id,
-                encrypted_payload,
-                settings.kms_key_reference,
-            ),
-        )
-        _audit(
-            cur,
-            principal,
-            "FISCAL_DOCUMENT_CREATE",
-            "document",
-            document_id,
-            correlation_id,
-            "ACCEPTED",
-        )
+        doc, _ = _create(cur, principal, data, key, request.state.correlation_id)
         conn.commit()
-        queue.enqueue_validation(
-            principal.tenant_id, str(document_id), str(correlation_id)
-        )
-        cur = conn.cursor()
-        cur.execute(
-            DOC_SELECT + " WHERE d.tenant_id=%s AND d.id=%s",
-            (principal.tenant_id, document_id),
-        )
-        return _document(cur.fetchone())
-    except ApiProblem:
-        conn.rollback()
-        raise
+        return documents.to_dto(doc)
     except Exception:
         conn.rollback()
         raise
@@ -775,64 +889,71 @@ def get_document(
 ):
     conn = get_conn()
     try:
-        cur = conn.cursor()
-        cur.execute(
-            DOC_SELECT + " WHERE d.tenant_id=%s AND d.id=%s",
-            (principal.tenant_id, document_id),
-        )
-        row = cur.fetchone()
-        if not row:
-            raise ApiProblem(404, "NOT_FOUND", "Recurso não encontrado.")
-        return _document(row)
+        doc = documents.load(conn.cursor(), principal.tenant_id, document_id)
+        if doc is None:
+            raise documents.not_found()
+        return documents.to_dto(doc)
     finally:
+        conn.rollback()
         put_conn(conn)
 
 
-@router.get("/documents")
+@router.get("/documents", response_model=FiscalDocumentPageDto)
 def list_documents(
-    page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100),
-    documentType: str | None = None,
-    status: str | None = None,
-    environment: str | None = None,
-    saleId: str | None = None,
+    limit: int = Query(20, ge=1, le=100),
+    cursor: str | None = Query(None, max_length=512),
+    documentType: Literal["NFSE", "NFCE_65", "NFE_55"] | None = None,
+    status: FiscalStatus | None = None,
+    date_from: datetime | None = Query(None, alias="from"),
+    date_to: datetime | None = Query(None, alias="to"),
     principal: Principal = Depends(require_permission("FISCAL_DOCUMENT_READ")),
 ):
     conn = get_conn()
     try:
-        cur = conn.cursor()
-        clauses = ["d.tenant_id=%s"]
-        params = [principal.tenant_id]
-        for col, val in (
-            ("d.document_type", documentType),
-            ("d.status", status),
-            ("d.environment", environment),
-            ("d.sale_id", saleId),
-        ):
-            if val:
-                clauses.append(col + "=%s")
-                params.append(val)
-        where = " AND ".join(clauses)
-        cur.execute("SELECT count(*) FROM fiscal_documents d WHERE " + where, params)
-        total = cur.fetchone()[0]
-        cur.execute(
-            DOC_SELECT
-            + " WHERE "
-            + where
-            + " ORDER BY d.created_at DESC,d.id DESC LIMIT %s OFFSET %s",
-            params + [size, (page - 1) * size],
+        docs, next_cursor = documents.list_page(
+            conn.cursor(),
+            principal.tenant_id,
+            limit=limit,
+            cursor=cursor,
+            document_type=documentType,
+            status=status.value if status else None,
+            date_from=date_from,
+            date_to=date_to,
         )
+        now = datetime.now(timezone.utc)
         return {
-            "items": [_document(r) for r in cur.fetchall()],
-            "page": page,
-            "size": size,
-            "total": total,
+            "items": [documents.to_dto(d, now) for d in docs],
+            "nextCursor": next_cursor,
         }
     finally:
+        conn.rollback()
         put_conn(conn)
 
 
-@router.post("/documents/{document_id}/cancel", status_code=202)
+def _command_document(cur, principal, document_id):
+    """Documento travado para um comando; outro tenant responde como inexistente."""
+    doc = documents.load(cur, principal.tenant_id, document_id, for_update=True)
+    if doc is None:
+        raise documents.not_found()
+    return doc
+
+
+def _active_substitution(cur, doc) -> bool:
+    cur.execute(
+        """SELECT 1 FROM fiscal_documents WHERE tenant_id=%s AND substitutes_document_id=%s
+           AND status NOT IN ('REJECTED','ERROR_FINAL','AUTHORIZED','CANCELLED')""",
+        (doc.tenant_id, doc.id),
+    )
+    return cur.fetchone() is not None
+
+
+def _invalid_state(message="Esta ação não é permitida no estado atual do documento."):
+    return ApiProblem(409, "INVALID_STATE_TRANSITION", message)
+
+
+@router.post(
+    "/documents/{document_id}/cancel", response_model=FiscalDocumentDto, status_code=202
+)
 def cancel_document(
     document_id: UUID,
     data: CancelFiscalDocumentRequest,
@@ -840,27 +961,293 @@ def cancel_document(
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     principal: Principal = Depends(require_permission("FISCAL_DOCUMENT_CANCEL")),
 ):
-    if not idempotency_key:
-        raise ApiProblem(400, "IDEMPOTENCY_KEY_REQUIRED", "Informe Idempotency-Key")
-    raise ApiProblem(409, "CAPABILITY_NOT_AVAILABLE", provider.reason)
+    key = documents.check_idempotency_key(idempotency_key)
+    digest = canonical_hash({"documentId": str(document_id), "reason": data.reason})
+    corr = request.state.correlation_id
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        doc = _command_document(cur, principal, document_id)
+        _require_fiscal_enabled()
+        existing = documents.find_idempotency(
+            cur, doc.tenant_id, doc.establishment_id, documents.OP_CANCEL, key
+        )
+        if existing:
+            replayed = _replayed(cur, doc.tenant_id, existing, digest)
+            conn.rollback()
+            return documents.to_dto(replayed)
+        if doc.status != S.AUTHORIZED or _active_substitution(cur, doc):
+            raise _invalid_state()
+        if documents.claim_idempotency(
+            cur,
+            doc.tenant_id,
+            doc.establishment_id,
+            documents.OP_CANCEL,
+            key,
+            digest,
+            doc.id,
+        ):
+            raise _invalid_state()  # outra requisição com a mesma chave chegou antes
+        blob = documents.seal_json(
+            cur, doc.tenant_id, {"reason": data.reason}, vault.keyring()
+        )
+        doc = documents.transition(
+            cur,
+            doc,
+            S.CANCEL_PENDING,
+            event="CANCEL_REQUESTED",
+            correlation_id=corr,
+            cancel_requested_at=datetime.now(timezone.utc),
+            cancel_reason_blob_id=blob,
+            fiscal_error_code=None,
+            fiscal_error_message=None,
+        )
+        documents.enqueue(
+            cur, doc.tenant_id, doc.id, "CANCEL", corr, settings.job_max_attempts
+        )
+        _audit(
+            cur,
+            principal,
+            "FISCAL_DOCUMENT_CANCEL",
+            "document",
+            doc.id,
+            corr,
+            "ACCEPTED",
+        )
+        conn.commit()
+        return documents.to_dto(documents.load(cur, doc.tenant_id, doc.id))
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        put_conn(conn)
 
 
-@router.post("/documents/{document_id}/retry", status_code=202)
+@router.post(
+    "/documents/{document_id}/retry", response_model=FiscalDocumentDto, status_code=202
+)
 def retry_document(
     document_id: UUID,
+    request: Request,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     principal: Principal = Depends(require_permission("FISCAL_DOCUMENT_CREATE")),
 ):
-    raise ApiProblem(409, "CAPABILITY_NOT_AVAILABLE", provider.reason)
+    key = documents.check_idempotency_key(idempotency_key)
+    digest = canonical_hash({"documentId": str(document_id), "command": "retry"})
+    corr = request.state.correlation_id
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        doc = _command_document(cur, principal, document_id)
+        _require_fiscal_enabled()
+        existing = documents.find_idempotency(
+            cur, doc.tenant_id, doc.establishment_id, documents.OP_RETRY, key
+        )
+        if existing:
+            replayed = _replayed(cur, doc.tenant_id, existing, digest)
+            conn.rollback()
+            return documents.to_dto(replayed)
+        if doc.status != S.ERROR_RETRYABLE:
+            raise _invalid_state()
+        if documents.claim_idempotency(
+            cur,
+            doc.tenant_id,
+            doc.establishment_id,
+            documents.OP_RETRY,
+            key,
+            digest,
+            doc.id,
+        ):
+            raise _invalid_state()
+        # Mesmo número e mesma intenção; se o último envio ficou incerto, o worker consulta antes.
+        doc = documents.transition(
+            cur,
+            doc,
+            S.QUEUED,
+            event="RETRY_REQUESTED",
+            correlation_id=corr,
+            fiscal_error_code=None,
+            fiscal_error_message=None,
+        )
+        documents.enqueue(
+            cur, doc.tenant_id, doc.id, "SUBMIT", corr, settings.job_max_attempts
+        )
+        _audit(
+            cur,
+            principal,
+            "FISCAL_DOCUMENT_RETRY",
+            "document",
+            doc.id,
+            corr,
+            "ACCEPTED",
+        )
+        conn.commit()
+        return documents.to_dto(documents.load(cur, doc.tenant_id, doc.id))
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        put_conn(conn)
 
 
-@router.get("/documents/{document_id}/xml")
-@router.get("/documents/{document_id}/auxiliary-document")
-def get_artifact(
+@router.post(
+    "/documents/{document_id}/substitute",
+    response_model=FiscalDocumentDto,
+    status_code=202,
+)
+def substitute_document(
+    document_id: UUID,
+    data: SubstituteFiscalDocumentRequest,
+    request: Request,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    principal: Principal = Depends(require_permission("FISCAL_DOCUMENT_CANCEL")),
+):
+    """Substituição (só NFS-e, e só com provider que a suporte). Devolve o substituto."""
+    key = documents.check_idempotency_key(idempotency_key)
+    digest = canonical_hash(
+        {
+            "documentId": str(document_id),
+            **data.model_dump(mode="json", exclude_none=True),
+        }
+    )
+    corr = request.state.correlation_id
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        original = _command_document(cur, principal, document_id)
+        _require_fiscal_enabled()
+        existing = documents.find_idempotency(
+            cur,
+            original.tenant_id,
+            original.establishment_id,
+            documents.OP_SUBSTITUTE,
+            key,
+        )
+        if existing:
+            replayed = _replayed(cur, original.tenant_id, existing, digest)
+            conn.rollback()
+            return documents.to_dto(replayed)
+        if original.status != S.AUTHORIZED or _active_substitution(cur, original):
+            raise _invalid_state()
+        replacement = data.replacement
+        if (
+            original.document_type != "NFSE"
+            or replacement.documentType != original.document_type
+            or not providers.provider_for(original.document_type).supports_substitution
+        ):
+            raise _unavailable(
+                ["SUBSTITUTION_UNAVAILABLE"],
+                "A substituição não está disponível para este documento.",
+            )
+        doc, _ = _create(
+            cur,
+            principal,
+            replacement,
+            key,
+            corr,
+            operation=documents.OP_SUBSTITUTE,
+            command_digest=digest,
+            substitutes=original,
+            extra_payload={"substitution": {"reason": data.reason}},
+        )
+        documents.record_event(
+            cur, original, "SUBSTITUTION_REQUESTED", None, None, corr
+        )
+        conn.commit()
+        return documents.to_dto(doc)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        put_conn(conn)
+
+
+@router.get("/documents/{document_id}/events", response_model=FiscalEventPageDto)
+def document_events(
     document_id: UUID,
     principal: Principal = Depends(require_permission("FISCAL_DOCUMENT_READ")),
 ):
-    # Deliberately uniform until private encrypted object storage is configured.
-    raise ApiProblem(404, "NOT_FOUND", "Recurso não encontrado.")
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        doc = documents.load(cur, principal.tenant_id, document_id)
+        if doc is None:
+            raise documents.not_found()
+        return {"items": documents.events(cur, doc.tenant_id, doc.id)}
+    finally:
+        conn.rollback()
+        put_conn(conn)
+
+
+def _download(document_id, principal, request, column: str, media_type: str, ext: str):
+    """Download com autorização a cada pedido e SHA-256 conferido. Auditado."""
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        doc = documents.load(cur, principal.tenant_id, document_id)
+        artifact_id = getattr(doc, column) if doc else None
+        if (
+            doc is None
+            or doc.status not in documents.EVIDENCE_STATUSES
+            or not artifact_id
+        ):
+            raise documents.not_found()
+        content, _ = documents.read_artifact(
+            cur, doc.tenant_id, artifact_id, vault.keyring()
+        )
+        _audit(
+            cur,
+            principal,
+            "FISCAL_ARTIFACT_DOWNLOAD",
+            "document",
+            doc.id,
+            request.state.correlation_id,
+            "SUCCESS",
+            {"artifact": ext},
+        )
+        conn.commit()
+        name = (doc.official_key or doc.id) + "." + ext
+        return Response(
+            content=content,
+            media_type=media_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="{name}"',
+                "Cache-Control": "no-store",
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        put_conn(conn)
+
+
+@router.get("/documents/{document_id}/xml")
+def get_xml(
+    document_id: UUID,
+    request: Request,
+    principal: Principal = Depends(require_permission("FISCAL_DOCUMENT_READ")),
+):
+    return _download(
+        document_id, principal, request, "xml_artifact_id", "application/xml", "xml"
+    )
+
+
+@router.get("/documents/{document_id}/auxiliary-document")
+def get_auxiliary_document(
+    document_id: UUID,
+    request: Request,
+    principal: Principal = Depends(require_permission("FISCAL_DOCUMENT_READ")),
+):
+    return _download(
+        document_id,
+        principal,
+        request,
+        "auxiliary_artifact_id",
+        "application/pdf",
+        "pdf",
+    )
 
 
 @router.get("/internal/readiness", include_in_schema=False)
@@ -869,6 +1256,6 @@ def readiness(principal: Principal = Depends(require_permission("FISCAL_CONFIG_R
         "ready": False,
         "fiscalFeature": settings.fiscal_enabled,
         "production": False,
-        "provider": "unavailable",
+        "provider": settings.fiscal_provider,
         "vault": settings.vault_provider,
     }
