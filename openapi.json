@@ -400,6 +400,45 @@
         }
       }
     },
+    "/api/v1/fiscal/csc": {
+      "put": {
+        "tags": [
+          "fiscal"
+        ],
+        "summary": "Put Csc",
+        "operationId": "put_csc_api_v1_fiscal_csc_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CscRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/fiscal/documents": {
       "post": {
         "tags": [
@@ -4617,10 +4656,10 @@
     "schemas": {
       "Body_import_certificate_api_v1_fiscal_certificates_post": {
         "properties": {
-          "file": {
+          "certificate": {
             "type": "string",
             "format": "binary",
-            "title": "File"
+            "title": "Certificate"
           },
           "password": {
             "type": "string",
@@ -4629,7 +4668,7 @@
         },
         "type": "object",
         "required": [
-          "file",
+          "certificate",
           "password"
         ],
         "title": "Body_import_certificate_api_v1_fiscal_certificates_post"
@@ -4749,6 +4788,17 @@
               }
             ],
             "title": "Lastvalidatedat"
+          },
+          "holderTaxId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Holdertaxid"
           }
         },
         "type": "object",
@@ -4833,6 +4883,29 @@
           "deletado"
         ],
         "title": "ClienteIn"
+      },
+      "CscRequest": {
+        "properties": {
+          "cscId": {
+            "type": "string",
+            "maxLength": 6,
+            "pattern": "^0*[1-9][0-9]{0,5}$",
+            "title": "Cscid"
+          },
+          "cscToken": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9]{16,36}$",
+            "title": "Csctoken"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "cscId",
+          "cscToken"
+        ],
+        "title": "CscRequest",
+        "description": "PUT /csc: vai só para o cofre; nunca é devolvido nem logado."
       },
       "DebitoClienteIn": {
         "properties": {

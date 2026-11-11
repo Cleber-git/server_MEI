@@ -204,6 +204,14 @@ class CertificateStatusDto(BaseModel):
     expiresAt: datetime | None = None
     type: str | None = None
     lastValidatedAt: datetime | None = None
+    holderTaxId: str | None = None
+
+
+class CscRequest(StrictModel):
+    """PUT /csc: vai só para o cofre; nunca é devolvido nem logado."""
+
+    cscId: str = Field(pattern=r"^0*[1-9][0-9]{0,5}$", max_length=6)
+    cscToken: str = Field(pattern=r"^[A-Za-z0-9]{16,36}$")
 
 
 class CancelFiscalDocumentRequest(StrictModel):

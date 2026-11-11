@@ -22,11 +22,26 @@ O contrato normativo gerado está em `openapi.json`. Todos os endpoints ficam em
 
 Queries incluem `tenant_id` da sessão. Recursos de outro tenant respondem como inexistentes. Jobs carregam tenant, documento e correlação. A constraint impede `AUTHORIZED` sem série, número, chave, protocolo, timestamp e artefato XML; o domínio também exige SHA-256 válido.
 
-## Certificados, segredos e artefatos
+## Cofre de segredos (F4, 2026-11-11)
 
-O upload aceita multipart PKCS#12 até o limite configurado, valida conteúdo, senha, chave privada, período, fingerprint e CNPJ do titular quando presente. Somente metadata e referência do cofre vão ao banco. O arquivo é cifrado com Fernet e permissão restrita; senha nunca é persistida. A implementação local exige disco persistente e chave entregue pelo secret manager. Para implantação distribuída, substitua pela interface `CertificateVault` usando KMS/HSM e object storage privado.
+Contrato: seção 4.3 e o `PUT /csc` da seção 4 de `Caltech-Mei/docs/fiscal-api-contract-v1.md`. Código em `fiscal/vault.py`; testes em `tests/test_vault_f4.py`.
 
-CSC e ID CSC possuem estrutura para referências de cofre, mas não têm endpoint ativo nesta entrega; NFC-e permanece indisponível. O storage local cifrado é imutável e particionado pelo hash do tenant/documento. URL assinada e downloads ficam indisponíveis até object storage privado ser configurado.
+- **Envelope AES-256-GCM no Postgres (`fiscal_vault_blobs`, migration `005`):** cada segredo tem uma DEK aleatória de 256 bits, embrulhada pela master key ativa. AAD = versão + tenant + id do blob + finalidade (`CERTIFICATE`/`CSC`), então blob movido de linha ou de tenant não decifra. Falha de integridade dá `VaultIntegrityError` (500 genérico, sem detalhe).
+- **Master keys:** `FISCAL_VAULT_MASTER_KEY=kid:base64(32 bytes)[,kid:base64…]` e `FISCAL_VAULT_ACTIVE_KEY_ID` (opcional com uma chave só). Entrada inválida é descartada. Sem chave válida, as rotas do cofre dão `503 FISCAL_DISABLED`; com `FISCAL_FEATURE_ENABLED=true`, o servidor nem sobe. Gerar: `python -c "import os,base64;print('v1:'+base64.b64encode(os.urandom(32)).decode())"`.
+- **Rotação:** acrescente a chave nova em `FISCAL_VAULT_MASTER_KEY`, aponte `FISCAL_VAULT_ACTIVE_KEY_ID` para ela e faça o deploy (blobs novos já usam a nova; os antigos continuam legíveis). Depois rode `vault.rewrap_all(conn, vault.keyring())` (reembrulha só a DEK, em lotes com `SKIP LOCKED`, idempotente) e, quando não sobrar blob com o kid antigo (`SELECT key_id,count(*) FROM fiscal_vault_blobs WHERE destroyed_at IS NULL GROUP BY 1`), tire a chave antiga da env.
+- **`POST /certificates`** (multipart `certificate` + `password`, até 64 KB):
+  - Estrutura PFX conferida antes de abrir, para separar `CERTIFICATE_INVALID` de `CERTIFICATE_INVALID_PASSWORD`.
+  - Exige RSA ≥ 2048 que corresponda ao certificado, folha que não seja AC nem autoassinada, política A1 da ICP-Brasil (`2.16.76.1.2.1.n`), `digitalSignature` quando houver KeyUsage e validade em curso (`CERTIFICATE_EXPIRED`).
+  - Cadeia do PFX conferida por nome, assinatura, `ca=true` e validade de cada emissora. **Não** há âncora nas raízes da ICP-Brasil (não versionadas): quem confere a confiança é a SEFIN/SEFAZ na transmissão.
+  - Titular: SAN otherName `2.16.76.1.3.3` (CNPJ do e-CNPJ) ou `2.16.76.1.3.1` (CPF do e-CPF); na falta, o sufixo `:<id>` do CN. Precisa ser o CNPJ do estabelecimento, ou o CPF do titular MEI em `fiscal_establishments.responsible_cpf` (preenchido pela F5). Sem titular legível, recusa (`CERTIFICATE_HOLDER_MISMATCH`).
+  - Recifra a chave PKCS#8 + certificado + cadeia num blob `CERTIFICATE`. O PFX e a senha não são guardados; a senha é convertida em `bytearray` e zerada após a leitura (o `str` do formulário fica com o Python até o GC).
+  - Mesmo fingerprint reenviado reativa a linha existente. Um certificado novo deixa o anterior `REPLACED`. Uploads do mesmo tenant são serializados por `FOR UPDATE` no estabelecimento.
+  - Resposta e `GET /certificates/status` trazem `holderTaxId` (colunas novas `holder_tax_id`/`holder_kind`).
+- **`DELETE /certificates/{id}`:** sem `X-Confirm-Revocation: REVOKE` dá `400 REVOCATION_CONFIRMATION_REQUIRED`. Revogar ou substituir **destrói** o blob (zera DEK embrulhada e cifra, `destroyed_at`). As versões antigas da linha somem do disco no vacuum do Postgres; a rotação da master key as torna ilegíveis de vez.
+- **`PUT /csc`** (`FISCAL_CONFIG_WRITE`): `{cscId: 1–6 dígitos, não zero, cscToken: 16–36 alfanuméricos}` → 204, sem corpo. Vai para um blob `CSC` referenciado por `fiscal_credentials` (`NFCE_CSC`); o anterior é destruído. Erro de validação não ecoa o valor. `vault.get_csc()` devolve o par em memória (F11).
+- **Assinatura e mTLS:** `vault.get_signing_credential(cur, tenant, ring)` devolve chave, certificado e cadeia em memória (só certificado `ACTIVE` e dentro da validade; o fingerprint do blob precisa bater com o cadastro). `vault.mtls_context(credential)` monta o `SSLContext` cliente (TLS ≥ 1.2, verificação do servidor ligada) a partir de um arquivo temporário 0600 (em `/dev/shm` quando existe), apagado logo após o `load_cert_chain`; cache por fingerprint por até 1 h ou até o vencimento, limpo na revogação/substituição.
+
+Artefatos (XML/PDF) e o payload de `/documents` ainda usam o storage local Fernet (`FISCAL_LOCAL_VAULT_KEY`) até a F7, que os passa para o Postgres.
 
 ## Fila
 
@@ -53,6 +68,7 @@ A partir da F0 (2026-11-11) quem manda é o contrato do app: `Caltech-Mei/docs/f
 - Antes de qualquer migration em produção: `pg_dump --format=custom --no-owner --file=backup-$(date +%Y%m%d-%H%M).dump "$DATABASE_URL"` (URL externa do Render, guardada fora do repo) e conferência do arquivo com `pg_restore --list`.
 - `000_legacy_uuid_unique.sql` (F1): cria `empresa_uuid_key`/`usuariomei_uuid_key` (índice único em `uuid`), exigidos pelo `REFERENCES` da `001`. Antes de criar, confere o banco. Coluna ausente ou que não seja texto, ou `uuid` duplicado, faz a migration parar com erro claro, e a transação desfaz tudo. Se já existir índice único só em `uuid`, ela não faz nada. O usuário confirmou no Render, em 2026-11-11, que não há `uuid` duplicado.
 - `002_auth_sessions_and_owner_permissions.sql` (F2): `auth_sessions.device_id_hash`, `auth_refresh_token_uses`, `auth_permission_defaults` e as permissões padrão do dono. Só `ADD COLUMN IF NOT EXISTS`, `CREATE … IF NOT EXISTS` e `INSERT … ON CONFLICT DO NOTHING`. Lê `usuariomei.datacadastro` e `ativo`.
+- `005_fiscal_vault.sql` (F4): `fiscal_vault_blobs`, `fiscal_certificates.holder_tax_id`/`holder_kind` e `fiscal_establishments.responsible_cpf`. Só `CREATE … IF NOT EXISTS` e `ADD COLUMN IF NOT EXISTS`; não lê nem altera dados existentes.
 - Não habilite produção sem homologação e aprovação registradas.
 
 ## Erros, correlação e logs (F1, 2026-11-11)

@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import os
+import re
 from dataclasses import dataclass
+
+_VAULT_KID_RE = re.compile(r"^[A-Za-z0-9_-]{1,32}$")
 
 
 def _bool(name: str, default: bool = False) -> bool:
@@ -18,13 +23,16 @@ class Settings:
     refresh_ttl: int = int(os.getenv("JWT_REFRESH_TTL_SECONDS", "2592000"))
     fiscal_enabled: bool = _bool("FISCAL_FEATURE_ENABLED")
     production_enabled: bool = _bool("FISCAL_PRODUCTION_ENABLED")
-    max_upload_bytes: int = int(os.getenv("FISCAL_MAX_UPLOAD_BYTES", "5242880"))
+    max_upload_bytes: int = int(os.getenv("FISCAL_MAX_UPLOAD_BYTES", "65536"))
     job_max_attempts: int = int(os.getenv("FISCAL_JOB_MAX_ATTEMPTS", "8"))
     artifact_root: str = os.getenv("FISCAL_ARTIFACT_ROOT", "")
     vault_provider: str = os.getenv("VAULT_PROVIDER", "disabled")
     kms_key_reference: str = os.getenv("KMS_KEY_REFERENCE", "")
+    # Até a F7 só o payload de /documents ainda usa esta chave Fernet.
     local_vault_key: str = os.getenv("FISCAL_LOCAL_VAULT_KEY", "")
-    local_vault_root: str = os.getenv("FISCAL_LOCAL_VAULT_ROOT", "fiscal-vault")
+    # Cofre (F4): "kid:base64(32 bytes)[,kid:base64…]" e o kid ativo.
+    vault_master_keys: str = os.getenv("FISCAL_VAULT_MASTER_KEY", "")
+    vault_active_key_id: str = os.getenv("FISCAL_VAULT_ACTIVE_KEY_ID", "")
 
     def signing_keys(self) -> dict[str, str]:
         pairs = [
@@ -36,12 +44,38 @@ class Settings:
             if kid.strip() and len(secret.strip()) >= 32
         }
 
+    def vault_keyring(self) -> tuple[dict[str, bytes], str]:
+        """Master keys do cofre e o kid ativo. Entrada inválida é descartada.
+
+        Sem ``FISCAL_VAULT_ACTIVE_KEY_ID`` e com uma chave só, ela é a ativa.
+        As mensagens de erro de quem chama nunca trazem o valor das chaves.
+        """
+        keys: dict[str, bytes] = {}
+        for entry in self.vault_master_keys.split(","):
+            kid, sep, encoded = entry.strip().partition(":")
+            if not sep or not _VAULT_KID_RE.match(kid):
+                continue
+            raw = encoded.strip()
+            try:
+                material = base64.b64decode(
+                    raw.replace("-", "+").replace("_", "/") + "=" * (-len(raw) % 4),
+                    validate=True,
+                )
+            except (binascii.Error, ValueError):
+                continue
+            if len(material) == 32:
+                keys[kid] = material
+        active = self.vault_active_key_id.strip()
+        if not active and len(keys) == 1:
+            active = next(iter(keys))
+        return keys, active
+
 
 settings = Settings()
 
 
 def assert_startup_ready(current: Settings | None = None) -> None:
-    """Com o fiscal ligado, o servidor não sobe sem chave JWT válida (F2).
+    """Com o fiscal ligado, o servidor não sobe sem chave JWT (F2) e do cofre (F4).
 
     Segredo com menos de 32 bytes é descartado por ``signing_keys()``, então
     também barra aqui. A mensagem nunca traz o valor das chaves.
@@ -59,4 +93,10 @@ def assert_startup_ready(current: Settings | None = None) -> None:
         raise RuntimeError(
             "FISCAL_FEATURE_ENABLED=true exige JWT_ACTIVE_KID igual a um kid de "
             "JWT_SIGNING_KEYS"
+        )
+    vault_keys, vault_active = current.vault_keyring()
+    if not vault_keys or vault_active not in vault_keys:
+        raise RuntimeError(
+            "FISCAL_FEATURE_ENABLED=true exige FISCAL_VAULT_MASTER_KEY no formato "
+            "kid:base64 de 32 bytes e FISCAL_VAULT_ACTIVE_KEY_ID igual a um desses kids"
         )

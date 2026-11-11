@@ -13,6 +13,7 @@ from fastapi import (
     Header,
     Query,
     Request,
+    Response,
     UploadFile,
 )
 
@@ -25,15 +26,16 @@ from .domain import Environment, canonical_hash, canonical_json
 from .errors import ApiProblem
 from .interfaces import UnavailableProvider
 from .queue import PostgresFiscalJobQueue
+from . import vault
 from .schemas import (
     CancelFiscalDocumentRequest,
     CreateFiscalDocumentRequest,
     CertificateStatusDto,
+    CscRequest,
     FiscalCapabilitiesDto,
     FiscalConfigDto,
     FiscalDocumentDto,
 )
-from .vault import LocalEncryptedCertificateVault
 
 router = APIRouter(prefix="/api/v1/fiscal", tags=["fiscal"])
 provider = UnavailableProvider()
@@ -221,95 +223,92 @@ def capabilities(
         put_conn(conn)
 
 
+_PFX_CONTENT_TYPES = {
+    "application/x-pkcs12",
+    "application/pkcs12",
+    "application/octet-stream",
+}
+
+
+def _locked_establishment(cur, tenant_id):
+    """``(id, cnpj, is_mei, responsible_cpf)`` com a linha travada (serializa uploads)."""
+    est = _establishment(cur, tenant_id)
+    cur.execute(
+        """SELECT id,cnpj,is_mei,responsible_cpf FROM fiscal_establishments
+           WHERE id=%s AND tenant_id=%s FOR UPDATE""",
+        (est[0], tenant_id),
+    )
+    return cur.fetchone()
+
+
 @router.post("/certificates", response_model=CertificateStatusDto)
 async def import_certificate(
     request: Request,
-    file: UploadFile = File(...),
+    certificate: UploadFile = File(...),
     password: str = Form(...),
     principal: Principal = Depends(require_permission("FISCAL_CERTIFICATE_MANAGE")),
 ):
-    if file.content_type not in {
-        "application/x-pkcs12",
-        "application/pkcs12",
-        "application/octet-stream",
-    }:
-        raise ApiProblem(415, "CERTIFICATE_INVALID", "Content-Type PKCS#12 obrigatório")
-    content = await file.read(settings.max_upload_bytes + 1)
-    if len(content) > settings.max_upload_bytes:
-        raise ApiProblem(413, "PAYLOAD_TOO_LARGE", "Arquivo maior que o permitido.")
+    secret = bytearray(password.encode("utf-8"))
+    del password
+    content = b""
+    try:
+        ring = vault.keyring()
+        if certificate.content_type not in _PFX_CONTENT_TYPES:
+            raise ApiProblem(
+                415, "CERTIFICATE_INVALID", "Envie o arquivo .pfx do certificado A1."
+            )
+        content = await certificate.read(vault.PFX_MAX_BYTES + 1)
+        if len(content) > vault.PFX_MAX_BYTES:
+            raise ApiProblem(413, "PAYLOAD_TOO_LARGE", "Arquivo maior que o permitido.")
+        parsed = vault.parse_pkcs12(content, secret)
+    finally:
+        secret[:] = bytes(len(secret))
+        content = b""
+        await certificate.close()
     conn = get_conn()
     try:
         cur = conn.cursor()
-        est = _establishment(cur, principal.tenant_id)
-        cur.execute(
-            "SELECT cnpj FROM fiscal_establishments WHERE id=%s AND tenant_id=%s",
-            (est[0], principal.tenant_id),
+        est_id, cnpj, is_mei, responsible_cpf = _locked_establishment(
+            cur, principal.tenant_id
         )
-        cnpj = cur.fetchone()[0]
-        metadata = LocalEncryptedCertificateVault().import_pkcs12(
-            principal.tenant_id, content, password
+        vault.check_holder(
+            parsed, cnpj=cnpj, is_mei=is_mei, responsible_cpf=responsible_cpf
         )
-        if (
-            metadata["holderTaxId"]
-            and "".join(ch for ch in cnpj if ch.isalnum()).upper()
-            != metadata["holderTaxId"].upper()
-        ):
-            LocalEncryptedCertificateVault().revoke(
-                principal.tenant_id, metadata["reference"]
-            )
-            raise ApiProblem(
-                422,
-                "CERTIFICATE_HOLDER_MISMATCH",
-                "Certificado não pertence ao estabelecimento",
-            )
-        cert_id = uuid4()
         now = datetime.now(timezone.utc)
-        cur.execute(
-            "UPDATE fiscal_certificates SET status='REPLACED',revoked_at=%s WHERE tenant_id=%s AND establishment_id=%s AND status='ACTIVE'",
-            (now, principal.tenant_id, est[0]),
-        )
-        cur.execute(
-            """INSERT INTO fiscal_certificates(id,tenant_id,establishment_id,vault_reference,fingerprint,serial_number,holder_masked,issuer,
-          valid_from,expires_at,type,status,last_validated_at) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'A1','ACTIVE',%s)""",
-            (
-                cert_id,
-                principal.tenant_id,
-                est[0],
-                metadata["reference"],
-                metadata["fingerprint"],
-                metadata["serial"],
-                metadata["holder"],
-                metadata["issuer"],
-                metadata["validFrom"],
-                metadata["expiresAt"],
-                now,
-            ),
+        stored = vault.store_certificate(
+            cur, principal.tenant_id, est_id, parsed, ring, now
         )
         _audit(
             cur,
             principal,
             "CERTIFICATE_IMPORT",
             "certificate",
-            cert_id,
+            stored.certificate_id,
             request.state.correlation_id,
             "SUCCESS",
+            {
+                "reactivated": stored.reactivated,
+                "replaced": len(stored.replaced_fingerprints),
+                "holderKind": parsed.holder.kind if parsed.holder else None,
+            },
         )
         conn.commit()
+        vault.forget_mtls(stored.replaced_fingerprints)
+        holder = parsed.holder
         return CertificateStatusDto(
             configured=True,
             valid=True,
-            certificateId=cert_id,
-            holder=metadata["holder"],
-            expiresAt=metadata["expiresAt"],
+            certificateId=stored.certificate_id,
+            holder=vault.mask_tax_id(holder.tax_id if holder else None),
+            expiresAt=parsed.expires_at,
             type="A1",
             lastValidatedAt=now,
+            holderTaxId=holder.tax_id if holder else None,
         )
-    except ApiProblem:
+    except Exception:
         conn.rollback()
         raise
     finally:
-        content = b""
-        password = ""
         put_conn(conn)
 
 
@@ -323,11 +322,12 @@ def certificate_status(
         est = _establishment(cur, principal.tenant_id)
         cur.execute(
             """SELECT id,holder_masked,expires_at,type,last_validated_at,
-          (status='ACTIVE' AND valid_from<=NOW() AND expires_at>NOW()) FROM fiscal_certificates
+          (status='ACTIVE' AND valid_from<=NOW() AND expires_at>NOW()),holder_tax_id FROM fiscal_certificates
           WHERE tenant_id=%s AND establishment_id=%s AND status='ACTIVE' ORDER BY created_at DESC LIMIT 1""",
             (principal.tenant_id, est[0]),
         )
         row = cur.fetchone()
+        conn.rollback()
         if not row:
             return CertificateStatusDto(configured=False, valid=False)
         return CertificateStatusDto(
@@ -338,6 +338,7 @@ def certificate_status(
             expiresAt=row[2],
             type=row[3],
             lastValidatedAt=row[4],
+            holderTaxId=row[6],
         )
     finally:
         put_conn(conn)
@@ -351,18 +352,23 @@ def revoke_certificate(
     principal: Principal = Depends(require_permission("FISCAL_CERTIFICATE_MANAGE")),
 ):
     if confirmation != "REVOKE":
-        raise ApiProblem(422, "VALIDATION_ERROR", "Envie X-Confirm-Revocation: REVOKE")
+        raise ApiProblem(
+            400,
+            "REVOCATION_CONFIRMATION_REQUIRED",
+            "Confirme a remoção do certificado.",
+        )
     conn = get_conn()
     try:
         cur = conn.cursor()
         cur.execute(
-            "SELECT vault_reference FROM fiscal_certificates WHERE id=%s AND tenant_id=%s AND status='ACTIVE' FOR UPDATE",
+            """SELECT vault_reference,fingerprint FROM fiscal_certificates
+               WHERE id=%s AND tenant_id=%s AND status='ACTIVE' FOR UPDATE""",
             (certificate_id, principal.tenant_id),
         )
         row = cur.fetchone()
         if not row:
             raise ApiProblem(404, "NOT_FOUND", "Recurso não encontrado.")
-        LocalEncryptedCertificateVault().revoke(principal.tenant_id, row[0])
+        vault.destroy(cur, principal.tenant_id, row[0])
         cur.execute(
             "UPDATE fiscal_certificates SET status='REVOKED',revoked_at=NOW() WHERE id=%s AND tenant_id=%s",
             (certificate_id, principal.tenant_id),
@@ -377,11 +383,45 @@ def revoke_certificate(
             "SUCCESS",
         )
         conn.commit()
-    except ApiProblem:
+        vault.forget_mtls([row[1].strip()])
+    except Exception:
         conn.rollback()
         raise
     finally:
         put_conn(conn)
+
+
+@router.put("/csc", status_code=204)
+def put_csc(
+    data: CscRequest,
+    request: Request,
+    principal: Principal = Depends(require_permission("FISCAL_CONFIG_WRITE")),
+):
+    ring = vault.keyring()
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        est_id = _locked_establishment(cur, principal.tenant_id)[0]
+        replaced = vault.store_csc(
+            cur, principal.tenant_id, est_id, data.cscId, data.cscToken, ring
+        )
+        _audit(
+            cur,
+            principal,
+            "CSC_UPDATE",
+            "establishment",
+            est_id,
+            request.state.correlation_id,
+            "SUCCESS",
+            {"replaced": replaced},
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        put_conn(conn)
+    return Response(status_code=204)
 
 
 @router.post("/documents", response_model=FiscalDocumentDto, status_code=202)

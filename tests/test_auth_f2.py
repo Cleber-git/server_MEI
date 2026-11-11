@@ -8,6 +8,7 @@ a checagem de startup das chaves JWT.
 
 from __future__ import annotations
 
+import base64
 import dataclasses
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
@@ -565,7 +566,12 @@ def test_startup_requires_jwt_keys_when_fiscal_enabled():
             assert_startup_ready(settings)
         assert secret not in str(exc.value) and "curto" not in str(exc.value)
     assert_startup_ready(
-        Settings(fiscal_enabled=True, jwt_keys="k1:" + secret, jwt_active_kid="k1")
+        Settings(
+            fiscal_enabled=True,
+            jwt_keys="k1:" + secret,
+            jwt_active_kid="k1",
+            vault_master_keys="v1:" + base64.b64encode(b"m" * 32).decode(),
+        )
     )
 
 
