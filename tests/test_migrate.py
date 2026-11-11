@@ -135,14 +135,63 @@ def _legacy_base(conn, *, with_unique_uuid: bool) -> None:
     conn.commit()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="001 faz REFERENCES empresa(uuid) e usuariomei(uuid), mas as tabelas legadas "
-    "não têm UNIQUE em uuid; correção aditiva prevista na F1",
-)
+def _unique_uuid_indexes(conn, table: str) -> list[str]:
+    cur = conn.cursor()
+    cur.execute(
+        """SELECT c.relname FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
+           JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = i.indkey[0]
+           WHERE i.indrelid = to_regclass(%s) AND i.indisunique AND i.indnkeyatts = 1
+             AND a.attname = 'uuid' ORDER BY 1""",
+        (table,),
+    )
+    return [row[0] for row in cur.fetchall()]
+
+
 def test_repo_migrations_apply_on_legacy_schema_as_created_by_main(pg_conn):
+    # F1: a 000 cria o índice único que a 001 precisa para o REFERENCES.
     _legacy_base(pg_conn, with_unique_uuid=False)
+    cur = pg_conn.cursor()
+    cur.execute("INSERT INTO empresa (uuid, cnpj, razaosocial, uf) VALUES ('e1', '1', 'X', 'SP')")
+    pg_conn.commit()
+    assert migrate.migrate(pg_conn) == [path.name for path in discover()]
+    assert _unique_uuid_indexes(pg_conn, "empresa") == ["empresa_uuid_key"]
+    assert _unique_uuid_indexes(pg_conn, "usuariomei") == ["usuariomei_uuid_key"]
+    assert {"auth_sessions", "fiscal_documents"} <= _tables(pg_conn)
+
+
+def test_uuid_migration_skips_when_a_unique_index_already_exists(pg_conn):
+    _legacy_base(pg_conn, with_unique_uuid=False)
+    cur = pg_conn.cursor()
+    cur.execute("ALTER TABLE empresa ADD CONSTRAINT empresa_pk PRIMARY KEY (uuid)")
+    pg_conn.commit()
     migrate.migrate(pg_conn)
+    assert _unique_uuid_indexes(pg_conn, "empresa") == ["empresa_pk"]
+
+
+def test_uuid_migration_refuses_duplicates_and_changes_nothing(pg_conn):
+    _legacy_base(pg_conn, with_unique_uuid=False)
+    cur = pg_conn.cursor()
+    cur.execute(
+        "INSERT INTO usuariomei (uuid, email, senhahash) VALUES ('u1','a','x'), ('u1','b','y')"
+    )
+    pg_conn.commit()
+    with pytest.raises(Exception, match="duplicado"):
+        migrate.migrate(pg_conn)
+    pg_conn.rollback()
+    assert _unique_uuid_indexes(pg_conn, "empresa") == []
+    assert "auth_sessions" not in _tables(pg_conn)
+    cur = pg_conn.cursor()
+    cur.execute("SELECT count(*) FROM usuariomei")
+    assert cur.fetchone()[0] == 2
+
+
+def test_uuid_migration_refuses_non_text_uuid_column(pg_conn):
+    cur = pg_conn.cursor()
+    cur.execute("CREATE TABLE empresa (uuid uuid NOT NULL)")
+    cur.execute("CREATE TABLE usuariomei (uuid text NOT NULL)")
+    pg_conn.commit()
+    with pytest.raises(Exception, match="esperado texto"):
+        migrate.migrate(pg_conn)
 
 
 def test_repo_migrations_apply_once_and_are_idempotent(pg_conn):

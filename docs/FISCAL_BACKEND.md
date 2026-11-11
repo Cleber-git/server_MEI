@@ -45,7 +45,7 @@ A partir da F0 (2026-11-11) quem manda é o contrato do app: `Caltech-Mei/docs/f
 - Gate local: `scripts/dev_check.sh` — sobe `server-mei-pg-test` (Postgres 17 em `127.0.0.1:55432`, descartável) e roda `ruff check .` + `pytest -q` num container Python 3.13. Testes de banco só aceitam DSN local (`SERVER_MEI_TEST_DSN`).
 - Migrations: `python migrate.py --dry-run` lista as pendentes sem escrever; `python migrate.py` aplica. Regras: arquivos `NNN_nome.sql`, nunca `*.down.sql`, sem `BEGIN/COMMIT` (cada arquivo roda numa transação do script), sem `DROP TABLE/COLUMN`, `TRUNCATE` ou `DELETE`, com `pg_advisory_lock` contra réplicas concorrentes.
 - Antes de qualquer migration em produção: `pg_dump --format=custom --no-owner --file=backup-$(date +%Y%m%d-%H%M).dump "$DATABASE_URL"` (URL externa do Render, guardada fora do repo) e conferência do arquivo com `pg_restore --list`.
-- Bloqueio conhecido: a `001` referencia `empresa(uuid)` e `usuariomei(uuid)`, que no DDL legado do `main.py` não têm `UNIQUE`; a correção aditiva é da F1 e exige inspecionar o schema real (somente leitura) antes.
+- `000_legacy_uuid_unique.sql` (F1): cria `empresa_uuid_key`/`usuariomei_uuid_key` (índice único em `uuid`), exigidos pelo `REFERENCES` da `001`. Antes de criar, confere o banco. Coluna ausente ou que não seja texto, ou `uuid` duplicado, faz a migration parar com erro claro, e a transação desfaz tudo. Se já existir índice único só em `uuid`, ela não faz nada. O usuário confirmou no Render, em 2026-11-11, que não há `uuid` duplicado.
 - Não habilite produção sem homologação e aprovação registradas.
 
 ## Erros, correlação e logs (F1, 2026-11-11)
