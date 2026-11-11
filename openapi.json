@@ -183,12 +183,13 @@
           "fiscal"
         ],
         "summary": "Put Config",
+        "description": "Troca de ambiente dentro do que o servidor permite (contrato 4.1).",
         "operationId": "put_config_api_v1_fiscal_config_put",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/FiscalConfigDto"
+                "$ref": "#/components/schemas/FiscalConfigUpdate"
               }
             }
           },
@@ -223,13 +224,83 @@
         ]
       }
     },
+    "/api/v1/fiscal/establishment": {
+      "get": {
+        "tags": [
+          "fiscal"
+        ],
+        "summary": "Get Establishment",
+        "operationId": "get_establishment_api_v1_fiscal_establishment_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FiscalEstablishmentDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "fiscal"
+        ],
+        "summary": "Put Establishment",
+        "operationId": "put_establishment_api_v1_fiscal_establishment_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FiscalEstablishmentUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FiscalEstablishmentDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/fiscal/capabilities": {
       "get": {
         "tags": [
           "fiscal"
         ],
-        "summary": "Capabilities",
-        "operationId": "capabilities_api_v1_fiscal_capabilities_get",
+        "summary": "Get Capabilities",
+        "operationId": "get_capabilities_api_v1_fiscal_capabilities_get",
         "security": [
           {
             "HTTPBearer": []
@@ -254,6 +325,107 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/FiscalCapabilitiesDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/fiscal/capabilities/evaluate": {
+      "post": {
+        "tags": [
+          "fiscal"
+        ],
+        "summary": "Evaluate Capability",
+        "operationId": "evaluate_capability_api_v1_fiscal_capabilities_evaluate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/EvaluateServiceRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EvaluateProductRequest"
+                  }
+                ],
+                "title": "Data"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilityEvaluationDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/fiscal/catalogs/{catalog_type}/metadata": {
+      "get": {
+        "tags": [
+          "fiscal"
+        ],
+        "summary": "Catalog Metadata",
+        "operationId": "catalog_metadata_api_v1_fiscal_catalogs__catalog_type__metadata_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "catalog_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Catalog Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogMetadataDto"
                 }
               }
             }
@@ -4721,6 +4893,175 @@
         ],
         "title": "CancelFiscalDocumentRequest"
       },
+      "CapabilityEvaluationDto": {
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "NFSE_AUTOMATIC",
+              "NFCE_65",
+              "NFE_55",
+              "OFFICIAL_NFF",
+              "STATE_NFAE",
+              "CERTIFICATE_SETUP",
+              "OFFICIAL_PORTAL",
+              "UNAVAILABLE",
+              "REQUIRES_FISCAL_REVIEW"
+            ],
+            "title": "Decision"
+          },
+          "capabilityId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capabilityid"
+          },
+          "capabilityVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capabilityversion"
+          },
+          "validUntil": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validuntil"
+          },
+          "allowedDocumentTypes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Alloweddocumenttypes"
+          },
+          "requiresCertificate": {
+            "type": "boolean",
+            "title": "Requirescertificate",
+            "default": true
+          },
+          "requiresCsc": {
+            "type": "boolean",
+            "title": "Requirescsc",
+            "default": false
+          },
+          "requiresStateRegistration": {
+            "type": "boolean",
+            "title": "Requiresstateregistration",
+            "default": false
+          },
+          "environment": {
+            "$ref": "#/components/schemas/Environment"
+          },
+          "layoutVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Layoutversion"
+          },
+          "rulesetVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rulesetversion"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "productionEligible": {
+            "type": "boolean",
+            "title": "Productioneligible",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "decision",
+          "environment",
+          "message"
+        ],
+        "title": "CapabilityEvaluationDto"
+      },
+      "CatalogMetadataDto": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Publishedat"
+          },
+          "validUntil": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validuntil"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "source",
+          "version",
+          "publishedAt",
+          "sha256"
+        ],
+        "title": "CatalogMetadataDto"
+      },
       "CertificateStatusDto": {
         "properties": {
           "configured": {
@@ -5177,6 +5518,527 @@
         ],
         "title": "Environment"
       },
+      "EstablishmentAddress": {
+        "properties": {
+          "postalCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{8}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Postalcode"
+          },
+          "street": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Street"
+          },
+          "number": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number"
+          },
+          "complement": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Complement"
+          },
+          "district": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "District"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EstablishmentAddress"
+      },
+      "EstablishmentMissing": {
+        "properties": {
+          "documentType": {
+            "$ref": "#/components/schemas/DocumentType"
+          },
+          "fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Fields"
+          }
+        },
+        "type": "object",
+        "required": [
+          "documentType",
+          "fields"
+        ],
+        "title": "EstablishmentMissing"
+      },
+      "EvaluateProductRequest": {
+        "properties": {
+          "environment": {
+            "$ref": "#/components/schemas/Environment",
+            "default": "RESTRICTED_PRODUCTION"
+          },
+          "operation": {
+            "$ref": "#/components/schemas/EvaluationOperation"
+          },
+          "recipient": {
+            "$ref": "#/components/schemas/EvaluationRecipient"
+          },
+          "logistics": {
+            "$ref": "#/components/schemas/EvaluationLogistics"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "operation",
+          "recipient",
+          "logistics"
+        ],
+        "title": "EvaluateProductRequest"
+      },
+      "EvaluateServiceRequest": {
+        "properties": {
+          "documentType": {
+            "type": "string",
+            "const": "NFSE",
+            "title": "Documenttype"
+          },
+          "environment": {
+            "$ref": "#/components/schemas/Environment",
+            "default": "RESTRICTED_PRODUCTION"
+          },
+          "service": {
+            "$ref": "#/components/schemas/EvaluationService"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "documentType",
+          "service"
+        ],
+        "title": "EvaluateServiceRequest"
+      },
+      "EvaluationAddress": {
+        "properties": {
+          "countryCode": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "title": "Countrycode"
+          },
+          "postalCode": {
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Postalcode"
+          },
+          "street": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Street"
+          },
+          "number": {
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Number"
+          },
+          "complement": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Complement"
+          },
+          "district": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "District"
+          },
+          "city": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "City"
+          },
+          "cityCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{7}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Citycode"
+          },
+          "uf": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Z]{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uf"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "countryCode",
+          "postalCode",
+          "street",
+          "number",
+          "city"
+        ],
+        "title": "EvaluationAddress"
+      },
+      "EvaluationLogistics": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "NO_TRANSPORT",
+              "CUSTOMER_PICKUP",
+              "DELIVERY"
+            ],
+            "title": "Mode"
+          },
+          "transportMode": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "SELLER_CONTRACTED",
+              "RECIPIENT_CONTRACTED",
+              "SELLER_OWN",
+              "RECIPIENT_OWN"
+            ],
+            "title": "Transportmode"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "mode",
+          "transportMode"
+        ],
+        "title": "EvaluationLogistics"
+      },
+      "EvaluationOperation": {
+        "properties": {
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "SALE",
+              "RETURN",
+              "SHIPMENT",
+              "TRANSFER",
+              "OTHER"
+            ],
+            "title": "Purpose"
+          },
+          "establishmentUf": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "title": "Establishmentuf"
+          },
+          "destination": {
+            "type": "string",
+            "enum": [
+              "INTERNAL",
+              "INTERSTATE"
+            ],
+            "title": "Destination"
+          },
+          "recipientType": {
+            "type": "string",
+            "enum": [
+              "INDIVIDUAL",
+              "LEGAL_ENTITY",
+              "FOREIGN"
+            ],
+            "title": "Recipienttype"
+          },
+          "recipientIcmsStatus": {
+            "type": "string",
+            "enum": [
+              "TAXPAYER",
+              "EXEMPT",
+              "NON_TAXPAYER",
+              "UNKNOWN"
+            ],
+            "title": "Recipienticmsstatus"
+          },
+          "consumerFinal": {
+            "type": "boolean",
+            "title": "Consumerfinal"
+          },
+          "salesChannel": {
+            "type": "string",
+            "enum": [
+              "IN_PERSON",
+              "DELIVERY",
+              "ECOMMERCE"
+            ],
+            "title": "Saleschannel"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "purpose",
+          "establishmentUf",
+          "destination",
+          "recipientType",
+          "recipientIcmsStatus",
+          "consumerFinal",
+          "salesChannel"
+        ],
+        "title": "EvaluationOperation"
+      },
+      "EvaluationRecipient": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "INDIVIDUAL",
+              "LEGAL_ENTITY",
+              "FOREIGN"
+            ],
+            "title": "Type"
+          },
+          "taxId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Taxid"
+          },
+          "icmsStatus": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "TAXPAYER",
+                  "EXEMPT",
+                  "NON_TAXPAYER",
+                  "UNKNOWN"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icmsstatus"
+          },
+          "stateRegistration": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stateregistration"
+          },
+          "countryCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Z]{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Countrycode"
+          },
+          "completeAddressProvided": {
+            "type": "boolean",
+            "title": "Completeaddressprovided"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvaluationAddress"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "completeAddressProvided"
+        ],
+        "title": "EvaluationRecipient"
+      },
+      "EvaluationService": {
+        "properties": {
+          "nationalTaxCode": {
+            "type": "string",
+            "pattern": "^\\d{6}$",
+            "title": "Nationaltaxcode"
+          },
+          "nbs": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{9}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nbs"
+          },
+          "emissionMode": {
+            "type": "string",
+            "enum": [
+              "SIMPLIFIED",
+              "COMPLETE",
+              "OFFICIAL_PORTAL",
+              "BLOCKED_REVIEW"
+            ],
+            "title": "Emissionmode"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(0|[1-9]\\d{0,12})(\\.\\d{1,4})?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "withholdingResponsibility": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "RECIPIENT",
+                  "INTERMEDIARY"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withholdingresponsibility"
+          },
+          "incidenceMunicipalityCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{7}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incidencemunicipalitycode"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "nationalTaxCode",
+          "emissionMode"
+        ],
+        "title": "EvaluationService"
+      },
       "FinanceAporteIn": {
         "properties": {
           "valor": {
@@ -5450,6 +6312,28 @@
               }
             ],
             "title": "Reason"
+          },
+          "nfseUnidentifiedRecipientAllowed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nfseunidentifiedrecipientallowed"
+          },
+          "stateOfficialChannelUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stateofficialchannelurl"
           }
         },
         "type": "object",
@@ -5504,6 +6388,57 @@
           "lastValidatedAt"
         ],
         "title": "FiscalConfigDto"
+      },
+      "FiscalConfigUpdate": {
+        "properties": {
+          "nfseEnvironment": {
+            "$ref": "#/components/schemas/Environment"
+          },
+          "nfeEnvironment": {
+            "$ref": "#/components/schemas/Environment"
+          },
+          "productionEnabled": {
+            "type": "boolean",
+            "title": "Productionenabled",
+            "default": false
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "SEFIN_NACIONAL",
+                  "SEFAZ_NFCE",
+                  "SEFAZ_NFE"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "lastValidatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastvalidatedat"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "nfseEnvironment",
+          "nfeEnvironment"
+        ],
+        "title": "FiscalConfigUpdate",
+        "description": "PUT /config. ``productionEnabled`` e ``lastValidatedAt`` são somente leitura."
       },
       "FiscalDocumentDto": {
         "properties": {
@@ -5666,6 +6601,288 @@
           "attempt"
         ],
         "title": "FiscalDocumentDto"
+      },
+      "FiscalEstablishmentDto": {
+        "properties": {
+          "cnpj": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cnpj"
+          },
+          "legalName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legalname"
+          },
+          "tradeName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tradename"
+          },
+          "stateRegistration": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stateregistration"
+          },
+          "municipalRegistration": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Municipalregistration"
+          },
+          "responsibleCpf": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responsiblecpf"
+          },
+          "cityCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Citycode"
+          },
+          "uf": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uf"
+          },
+          "address": {
+            "$ref": "#/components/schemas/EstablishmentAddress"
+          },
+          "taxRegime": {
+            "type": "string",
+            "title": "Taxregime"
+          },
+          "simei": {
+            "type": "boolean",
+            "title": "Simei"
+          },
+          "cnaes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Cnaes"
+          },
+          "fiscalEnabled": {
+            "type": "boolean",
+            "title": "Fiscalenabled"
+          },
+          "missingFields": {
+            "items": {
+              "$ref": "#/components/schemas/EstablishmentMissing"
+            },
+            "type": "array",
+            "title": "Missingfields"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cnpj",
+          "legalName",
+          "tradeName",
+          "stateRegistration",
+          "municipalRegistration",
+          "responsibleCpf",
+          "cityCode",
+          "uf",
+          "address",
+          "taxRegime",
+          "simei",
+          "cnaes",
+          "fiscalEnabled",
+          "missingFields"
+        ],
+        "title": "FiscalEstablishmentDto"
+      },
+      "FiscalEstablishmentUpdate": {
+        "properties": {
+          "cnpj": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 18
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cnpj"
+          },
+          "legalName": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Legalname"
+          },
+          "tradeName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tradename"
+          },
+          "stateRegistration": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{2,14}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stateregistration"
+          },
+          "municipalRegistration": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9A-Za-z]{1,20}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Municipalregistration"
+          },
+          "responsibleCpf": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{11}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responsiblecpf"
+          },
+          "cityCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{7}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Citycode"
+          },
+          "uf": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "title": "Uf"
+          },
+          "address": {
+            "$ref": "#/components/schemas/EstablishmentAddress"
+          },
+          "taxRegime": {
+            "type": "string",
+            "const": "MEI",
+            "title": "Taxregime",
+            "default": "MEI"
+          },
+          "simei": {
+            "type": "boolean",
+            "title": "Simei",
+            "default": true
+          },
+          "cnaes": {
+            "items": {
+              "type": "string",
+              "pattern": "^\\d{7}$"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Cnaes"
+          },
+          "fiscalEnabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fiscalenabled"
+          },
+          "missingFields": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EstablishmentMissing"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Missingfields"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "legalName",
+          "uf"
+        ],
+        "title": "FiscalEstablishmentUpdate",
+        "description": "PUT /establishment. CNPJ vem do cadastro da empresa e não muda por aqui:\nse vier, precisa ser o mesmo. ``fiscalEnabled``/``missingFields`` são ignorados\n(somente leitura), para o app poder devolver o que recebeu no GET."
       },
       "FiscalStatus": {
         "type": "string",

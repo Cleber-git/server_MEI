@@ -185,6 +185,16 @@ class FiscalConfigDto(BaseModel):
     lastValidatedAt: datetime | None
 
 
+class FiscalConfigUpdate(StrictModel):
+    """PUT /config. ``productionEnabled`` e ``lastValidatedAt`` são somente leitura."""
+
+    nfseEnvironment: Environment
+    nfeEnvironment: Environment
+    productionEnabled: bool = False
+    provider: Literal["SEFIN_NACIONAL", "SEFAZ_NFCE", "SEFAZ_NFE"] | None = None
+    lastValidatedAt: datetime | None = None
+
+
 class FiscalCapabilitiesDto(BaseModel):
     uf: str
     version: str
@@ -194,6 +204,178 @@ class FiscalCapabilitiesDto(BaseModel):
     nffOfficialChannel: bool = False
     requiresCertificate: bool = False
     reason: str | None = None
+    # Sempre enviados (podem ser null): ausência nunca autoriza nada no app.
+    nfseUnidentifiedRecipientAllowed: bool | None = None
+    stateOfficialChannelUrl: str | None = None
+
+
+# --- Estabelecimento (contrato seção 5) ----------------------------------------
+
+Text200 = Annotated[str, Field(min_length=1, max_length=200)]
+
+
+class EstablishmentAddress(StrictModel):
+    postalCode: str | None = Field(default=None, pattern=r"^\d{8}$")
+    street: str | None = Field(default=None, min_length=1, max_length=120)
+    number: str | None = Field(default=None, min_length=1, max_length=20)
+    complement: str | None = Field(default=None, max_length=60)
+    district: str | None = Field(default=None, min_length=1, max_length=60)
+    city: str | None = Field(default=None, min_length=1, max_length=60)
+
+
+class EstablishmentMissing(BaseModel):
+    documentType: DocumentType
+    fields: list[str]
+
+
+class FiscalEstablishmentDto(BaseModel):
+    cnpj: str | None
+    legalName: str | None
+    tradeName: str | None
+    stateRegistration: str | None
+    municipalRegistration: str | None
+    responsibleCpf: str | None
+    cityCode: str | None
+    uf: str | None
+    address: EstablishmentAddress
+    taxRegime: str
+    simei: bool
+    cnaes: list[str]
+    fiscalEnabled: bool
+    missingFields: list[EstablishmentMissing]
+
+
+class FiscalEstablishmentUpdate(StrictModel):
+    """PUT /establishment. CNPJ vem do cadastro da empresa e não muda por aqui:
+    se vier, precisa ser o mesmo. ``fiscalEnabled``/``missingFields`` são ignorados
+    (somente leitura), para o app poder devolver o que recebeu no GET."""
+
+    cnpj: str | None = Field(default=None, max_length=18)
+    legalName: Text200
+    tradeName: str | None = Field(default=None, max_length=200)
+    stateRegistration: str | None = Field(default=None, pattern=r"^\d{2,14}$")
+    municipalRegistration: str | None = Field(
+        default=None, pattern=r"^[0-9A-Za-z]{1,20}$"
+    )
+    responsibleCpf: str | None = Field(default=None, pattern=r"^\d{11}$")
+    cityCode: str | None = Field(default=None, pattern=r"^\d{7}$")
+    uf: str = Field(pattern=r"^[A-Z]{2}$")
+    address: EstablishmentAddress = Field(default_factory=EstablishmentAddress)
+    taxRegime: Literal["MEI"] = "MEI"
+    simei: bool = True
+    cnaes: list[Annotated[str, Field(pattern=r"^\d{7}$")]] = Field(
+        default_factory=list, max_length=20
+    )
+    fiscalEnabled: bool | None = None
+    missingFields: list[EstablishmentMissing] | None = None
+
+
+# --- /capabilities/evaluate (contrato 4.2) --------------------------------------
+
+
+class EvaluationAddress(StrictModel):
+    countryCode: str = Field(pattern=r"^[A-Z]{2}$")
+    postalCode: str = Field(min_length=1, max_length=20)
+    street: str = Field(min_length=1, max_length=120)
+    number: str = Field(min_length=1, max_length=20)
+    complement: str | None = Field(default=None, max_length=60)
+    district: str | None = Field(default=None, max_length=60)
+    city: str = Field(min_length=1, max_length=60)
+    cityCode: str | None = Field(default=None, pattern=r"^\d{7}$")
+    uf: str | None = Field(default=None, pattern=r"^[A-Z]{2}$")
+
+
+class EvaluationOperation(StrictModel):
+    purpose: Literal["SALE", "RETURN", "SHIPMENT", "TRANSFER", "OTHER"]
+    establishmentUf: str = Field(pattern=r"^[A-Z]{2}$")
+    destination: Literal["INTERNAL", "INTERSTATE"]
+    recipientType: Literal["INDIVIDUAL", "LEGAL_ENTITY", "FOREIGN"]
+    recipientIcmsStatus: Literal["TAXPAYER", "EXEMPT", "NON_TAXPAYER", "UNKNOWN"]
+    consumerFinal: bool
+    salesChannel: Literal["IN_PERSON", "DELIVERY", "ECOMMERCE"]
+
+
+class EvaluationRecipient(StrictModel):
+    type: Literal["INDIVIDUAL", "LEGAL_ENTITY", "FOREIGN"]
+    taxId: str | None = Field(default=None, max_length=32)
+    icmsStatus: Literal["TAXPAYER", "EXEMPT", "NON_TAXPAYER", "UNKNOWN"] | None = None
+    stateRegistration: str | None = Field(default=None, max_length=20)
+    countryCode: str | None = Field(default=None, pattern=r"^[A-Z]{2}$")
+    completeAddressProvided: bool
+    address: EvaluationAddress | None = None
+
+
+class EvaluationLogistics(StrictModel):
+    mode: Literal["NO_TRANSPORT", "CUSTOMER_PICKUP", "DELIVERY"]
+    transportMode: Literal[
+        "NONE",
+        "SELLER_CONTRACTED",
+        "RECIPIENT_CONTRACTED",
+        "SELLER_OWN",
+        "RECIPIENT_OWN",
+    ]
+
+
+class EvaluateProductRequest(StrictModel):
+    environment: Environment = Environment.RESTRICTED_PRODUCTION
+    operation: EvaluationOperation
+    recipient: EvaluationRecipient
+    logistics: EvaluationLogistics
+
+
+class EvaluationService(StrictModel):
+    nationalTaxCode: str = Field(pattern=r"^\d{6}$")
+    nbs: str | None = Field(default=None, pattern=r"^\d{9}$")
+    emissionMode: Literal["SIMPLIFIED", "COMPLETE", "OFFICIAL_PORTAL", "BLOCKED_REVIEW"]
+    description: str | None = Field(default=None, max_length=2000)
+    amount: DecimalText | None = None
+    withholdingResponsibility: Literal["RECIPIENT", "INTERMEDIARY"] | None = None
+    incidenceMunicipalityCode: str | None = Field(default=None, pattern=r"^\d{7}$")
+
+
+class EvaluateServiceRequest(StrictModel):
+    documentType: Literal["NFSE"]
+    environment: Environment = Environment.RESTRICTED_PRODUCTION
+    service: EvaluationService
+
+
+EvaluateRequest = Union[EvaluateServiceRequest, EvaluateProductRequest]
+
+
+class CapabilityEvaluationDto(BaseModel):
+    decision: Literal[
+        "NFSE_AUTOMATIC",
+        "NFCE_65",
+        "NFE_55",
+        "OFFICIAL_NFF",
+        "STATE_NFAE",
+        "CERTIFICATE_SETUP",
+        "OFFICIAL_PORTAL",
+        "UNAVAILABLE",
+        "REQUIRES_FISCAL_REVIEW",
+    ]
+    capabilityId: str | None = None
+    capabilityVersion: str | None = None
+    validUntil: datetime | None = None
+    allowedDocumentTypes: list[str] = Field(default_factory=list)
+    requiresCertificate: bool = True
+    requiresCsc: bool = False
+    requiresStateRegistration: bool = False
+    environment: Environment
+    layoutVersion: str | None = None
+    rulesetVersion: str | None = None
+    reasons: list[str] = Field(default_factory=list)
+    message: str
+    productionEligible: bool = False
+
+
+class CatalogMetadataDto(BaseModel):
+    type: str
+    source: str
+    version: str
+    publishedAt: datetime
+    validUntil: datetime | None = None
+    sha256: str
 
 
 class CertificateStatusDto(BaseModel):

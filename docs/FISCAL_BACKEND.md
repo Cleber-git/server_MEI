@@ -43,6 +43,24 @@ Contrato: seção 4.3 e o `PUT /csc` da seção 4 de `Caltech-Mei/docs/fiscal-ap
 
 Artefatos (XML/PDF) e o payload de `/documents` ainda usam o storage local Fernet (`FISCAL_LOCAL_VAULT_KEY`) até a F7, que os passa para o Postgres.
 
+## Estabelecimento, config e capabilities (F5, 2026-11-11)
+
+Contrato: seções 4.1, 4.2, 5 e 6 de `Caltech-Mei/docs/fiscal-api-contract-v1.md`. Código em `fiscal/establishment.py`, `fiscal/capabilities.py` e `fiscal/api.py`; testes em `tests/test_capabilities_f5.py`.
+
+- **`GET/PUT /establishment`** (`FISCAL_CONFIG_READ`/`WRITE`):
+  - O CNPJ vem sempre de `empresa.cnpj` do tenant do token. Se o corpo trouxer `cnpj`, precisa ser o mesmo (com ou sem máscara); outro valor dá `422 VALIDATION_FAILED` (`cnpj`/`READ_ONLY`), sem eco.
+  - Valida UF, `cityCode` com o prefixo IBGE da UF, CEP de 8 dígitos, IE só com dígitos (ISENTO não vale para quem emite), CPF do titular com DV e `taxRegime = MEI`. Campo desconhecido dá 422.
+  - `missingFields` lista o que falta para `NFSE`, `NFCE_65` e `NFE_55` (base: CNPJ válido, razão social, UF, município IBGE e endereço; produto também exige IE). `fiscalEnabled` liga sozinho quando a NFS-e está completa e desliga se o cadastro voltar a ficar incompleto.
+  - Sem estabelecimento, o GET mostra o que se sabe da empresa e o PUT cria a linha (mesmo id determinístico da `001`) e a `fiscal_configurations`.
+  - Auditado (`ESTABLISHMENT_UPDATE`) só com `fiscalEnabled` e a contagem do que falta, sem PII.
+- **`GET/PUT /config`:** `productionEnabled` é calculado (env `FISCAL_PRODUCTION_ENABLED` + flags do estabelecimento e da configuração + homologação, monitoramento e checklist aprovados) e é somente leitura: enviar outro valor dá `422` (`READ_ONLY`). Pedir ambiente `PRODUCTION` sem isso dá `403 PRODUCTION_NOT_ENABLED`. `provider` só aceita `SEFIN_NACIONAL | SEFAZ_NFCE | SEFAZ_NFE | null`. Sem estabelecimento: `422 ESTABLISHMENT_INCOMPLETE` (antes `FISCAL_CONFIGURATION_INCOMPLETE`, fora do contrato).
+- **`fiscal_capabilities` (migration `006`):** uma linha imutável por UF × operação (`NFSE`, `NFCE_65`, `NFE_55`, `OFFICIAL_NFF`, `STATE_NFAE`) × ambiente × `effective_from`. Vale a mais nova já em vigor; mudar um dado = inserir linha nova. Linha `available`/`accredited` sem `source_url` e `verified_at` é recusada por CHECK, e `source_url`/`official_channel_url` só aceitam `https` em `*.gov.br`, sem credenciais nem porta (CHECK no banco + `is_safe_gov_url`, a mesma régua do app).
+  - **Seed `2026-11-11.1`:** tudo indisponível nas 27 UFs. Exceção: NFF (canal oficial; o servidor não emite) em RS, SC e PI, conferido no portal oficial em 2026-11-11 (`https://dfe-portal.svrs.rs.gov.br/Nff/Noticias/2916`: módulo MEI em RS/SC desde 23/10/2023 e no PI desde 21/03/2024). Nenhuma URL de emissor estadual foi semeada (não verificada).
+  - **Emissão automática** (`nfseAutomatic`/`nfce`/`nfe`) só com linha disponível, credenciada, com fonte e dentro da validade **e** homologação `APPROVED` do tenant na UF em `fiscal_homologation_checks` (`model` = operação) **e** `FISCAL_FEATURE_ENABLED=true`.
+- **`GET /capabilities?uf=`:** formato exato do app, sempre com `nfseUnidentifiedRecipientAllowed` e `stateOfficialChannelUrl` (podem ser null). UF diferente da do cadastro, ou cadastro incompleto, dá tudo falso com o motivo. Sem canal automático ligado, `requiresCertificate` é sempre `true`.
+- **`POST /capabilities/evaluate`:** fatos de serviço (`{documentType: "NFSE", service}`) ou de produto (`{operation, recipient, logistics}`), espelhando o `ProductDocumentRoutingPolicy` do app e falhando para o lado bloqueado. A UF que vale é a do cadastro (a do corpo diferente ⇒ revisão fiscal). Ordem no produto: finalidade ≠ venda, estrangeiro ou ICMS desconhecido ⇒ revisão; NFF disponível ⇒ `OFFICIAL_NFF`; NFC-e só em venda interna, presencial, consumidor final PF não contribuinte e sem entrega; NF-e exige endereço completo do destinatário; depois cadastro, certificado e CSC. Decisão positiva vale 1 h (`validUntil`). `productionEligible` só em `PRODUCTION` com o gate do servidor.
+- **`GET /catalogs/{type}/metadata`** (`fiscal_catalog_metadata`, fonte só `*.gov.br`, SHA-256): nenhum catálogo foi carregado, então todos (e tipo desconhecido) respondem `404 NOT_FOUND`.
+
 ## Fila
 
 `PostgresFiscalJobQueue` persiste jobs e dá base para lease, tentativas e DLQ. Não há worker transmissor ativo. Nenhum provider consegue gerar autorização falsa. Antes de ativar processamento, implemente claim com `FOR UPDATE SKIP LOCKED`, backoff+jitter, métricas, alertas e reconciliação conforme cada autorizador.
@@ -55,6 +73,7 @@ Artefatos (XML/PDF) e o payload de `/documents` ainda usam o storage local Ferne
 - RTC atualizada em 15/07/2026: NT 009 e anexos 1.04.00/1.02.00 publicados, explicitamente ainda não disponíveis em Produção/Produção Restrita em agosto/2026: https://www.gov.br/nfse/pt-br/biblioteca/documentacao-tecnica/rtc
 - NF-e/NFC-e: https://www.nfe.fazenda.gov.br/ — o portal entrou em loop de redirecionamento durante esta execução; MOC/schemas/NTs não foram presumidos.
 - NFF/SVRS: o portal descreve emissão pelo App NFF e sistema centralizado; nenhuma API privada foi inferida: https://dfe-portal.svrs.rs.gov.br/Nff
+- NFF módulo MEI (conferido em 2026-11-11): RS e SC desde 23/10/2023, PI desde 21/03/2024; a página não traz lista consolidada de UFs: https://dfe-portal.svrs.rs.gov.br/Nff/Noticias/2916
 
 ## Contrato canônico e plano
 
@@ -69,6 +88,7 @@ A partir da F0 (2026-11-11) quem manda é o contrato do app: `Caltech-Mei/docs/f
 - `000_legacy_uuid_unique.sql` (F1): cria `empresa_uuid_key`/`usuariomei_uuid_key` (índice único em `uuid`), exigidos pelo `REFERENCES` da `001`. Antes de criar, confere o banco. Coluna ausente ou que não seja texto, ou `uuid` duplicado, faz a migration parar com erro claro, e a transação desfaz tudo. Se já existir índice único só em `uuid`, ela não faz nada. O usuário confirmou no Render, em 2026-11-11, que não há `uuid` duplicado.
 - `002_auth_sessions_and_owner_permissions.sql` (F2): `auth_sessions.device_id_hash`, `auth_refresh_token_uses`, `auth_permission_defaults` e as permissões padrão do dono. Só `ADD COLUMN IF NOT EXISTS`, `CREATE … IF NOT EXISTS` e `INSERT … ON CONFLICT DO NOTHING`. Lê `usuariomei.datacadastro` e `ativo`.
 - `005_fiscal_vault.sql` (F4): `fiscal_vault_blobs`, `fiscal_certificates.holder_tax_id`/`holder_kind` e `fiscal_establishments.responsible_cpf`. Só `CREATE … IF NOT EXISTS` e `ADD COLUMN IF NOT EXISTS`; não lê nem altera dados existentes.
+- `006_fiscal_capabilities.sql` (F5): `fiscal_establishments.address_city`, `fiscal_capabilities` com o seed conservador e `fiscal_catalog_metadata` (vazia). Só `ADD COLUMN IF NOT EXISTS`, `CREATE … IF NOT EXISTS` e `INSERT … ON CONFLICT DO NOTHING`; não lê nem altera dados existentes.
 - Não habilite produção sem homologação e aprovação registradas.
 
 ## Erros, correlação e logs (F1, 2026-11-11)

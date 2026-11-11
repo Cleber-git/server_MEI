@@ -22,19 +22,26 @@ from psycopg2.extras import Json
 from db import get_conn, put_conn
 from .auth import Principal, require_permission
 from .config import settings
-from .domain import Environment, canonical_hash, canonical_json
+from .domain import DocumentType, Environment, canonical_hash, canonical_json
 from .errors import ApiProblem
 from .interfaces import UnavailableProvider
 from .queue import PostgresFiscalJobQueue
-from . import vault
+from . import capabilities, establishment, vault
 from .schemas import (
     CancelFiscalDocumentRequest,
+    CapabilityEvaluationDto,
+    CatalogMetadataDto,
     CreateFiscalDocumentRequest,
     CertificateStatusDto,
     CscRequest,
+    EvaluateRequest,
+    EvaluateServiceRequest,
     FiscalCapabilitiesDto,
     FiscalConfigDto,
+    FiscalConfigUpdate,
     FiscalDocumentDto,
+    FiscalEstablishmentDto,
+    FiscalEstablishmentUpdate,
 )
 
 router = APIRouter(prefix="/api/v1/fiscal", tags=["fiscal"])
@@ -55,10 +62,22 @@ def _establishment(cur, tenant_id):
     if not row:
         raise ApiProblem(
             422,
-            "FISCAL_CONFIGURATION_INCOMPLETE",
-            "Cadastre um estabelecimento fiscal válido",
+            "ESTABLISHMENT_INCOMPLETE",
+            "Complete o cadastro fiscal da empresa.",
         )
     return row
+
+
+def _production_effective(est) -> bool:
+    """Produção só com todos os gates do servidor e do operador (nunca pelo cliente)."""
+    return bool(
+        settings.production_enabled
+        and est[4]
+        and est[10]
+        and est[11] is not None
+        and est[12]
+        and est[13] is not None
+    )
 
 
 def _audit(
@@ -125,13 +144,11 @@ def get_config(
     try:
         cur = conn.cursor()
         est = _establishment(cur, principal.tenant_id)
-        # There is no homologated provider in this delivery. Database/client
-        # flags can never bypass this operational gate.
-        effective = False
+        conn.rollback()
         return FiscalConfigDto(
             nfseEnvironment=est[5],
             nfeEnvironment=est[6],
-            productionEnabled=effective,
+            productionEnabled=_production_effective(est),
             provider=est[7],
             lastValidatedAt=est[8],
         )
@@ -141,30 +158,37 @@ def get_config(
 
 @router.put("/config", response_model=FiscalConfigDto)
 def put_config(
-    data: FiscalConfigDto,
+    data: FiscalConfigUpdate,
     request: Request,
     principal: Principal = Depends(require_permission("FISCAL_CONFIG_WRITE")),
 ):
-    if (
-        data.productionEnabled
-        and "FISCAL_PRODUCTION_ENABLE" not in principal.permissions
-    ):
-        raise ApiProblem(
-            403, "PERMISSION_DENIED", "Você não tem permissão para esta ação."
-        )
+    """Troca de ambiente dentro do que o servidor permite (contrato 4.1)."""
     conn = get_conn()
     try:
         cur = conn.cursor()
         est = _establishment(cur, principal.tenant_id)
-        if data.productionEnabled:
+        effective = _production_effective(est)
+        if data.productionEnabled != effective:
+            # Somente leitura: só o operador liga a produção, nunca o app.
             raise ApiProblem(
-                409,
-                "HOMOLOGATION_REQUIRED",
-                "A ativação exige checklist, homologação e aprovação operacional no servidor",
+                422,
+                "VALIDATION_FAILED",
+                "A produção é ligada somente pelo operador do servidor.",
+                field_errors=[{"path": "productionEnabled", "code": "READ_ONLY"}],
+            )
+        wants_production = Environment.PRODUCTION in (
+            data.nfseEnvironment,
+            data.nfeEnvironment,
+        )
+        if wants_production and not effective:
+            raise ApiProblem(
+                403,
+                "PRODUCTION_NOT_ENABLED",
+                "A produção ainda não foi liberada para esta empresa.",
             )
         cur.execute(
             """UPDATE fiscal_configurations SET nfse_environment=%s,nfe_environment=%s,nfse_provider=%s,
-          production_requested=FALSE,production_enabled=FALSE,version=version+1 WHERE establishment_id=%s""",
+          version=version+1 WHERE establishment_id=%s""",
             (
                 data.nfseEnvironment.value,
                 data.nfeEnvironment.value,
@@ -185,41 +209,235 @@ def put_config(
         return FiscalConfigDto(
             nfseEnvironment=data.nfseEnvironment,
             nfeEnvironment=data.nfeEnvironment,
-            productionEnabled=False,
+            productionEnabled=effective,
             provider=data.provider,
             lastValidatedAt=est[8],
         )
-    except ApiProblem:
+    except Exception:
         conn.rollback()
         raise
     finally:
         put_conn(conn)
 
 
+@router.get("/establishment", response_model=FiscalEstablishmentDto)
+def get_establishment(
+    principal: Principal = Depends(require_permission("FISCAL_CONFIG_READ")),
+):
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        data = establishment.load(cur, principal.tenant_id)
+        if data is None:
+            data = establishment.from_company(
+                establishment.company(cur, principal.tenant_id)
+            )
+        conn.rollback()
+        return establishment.to_dto(data)
+    finally:
+        conn.rollback()
+        put_conn(conn)
+
+
+@router.put("/establishment", response_model=FiscalEstablishmentDto)
+def put_establishment(
+    data: FiscalEstablishmentUpdate,
+    request: Request,
+    principal: Principal = Depends(require_permission("FISCAL_CONFIG_WRITE")),
+):
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        company = establishment.company(cur, principal.tenant_id)
+        establishment.validate_update(data, company["cnpj"])
+        saved = establishment.save(cur, principal.tenant_id, data, company["cnpj"])
+        dto = establishment.to_dto(saved)
+        _audit(
+            cur,
+            principal,
+            "ESTABLISHMENT_UPDATE",
+            "establishment",
+            saved["id"],
+            request.state.correlation_id,
+            "SUCCESS",
+            {
+                "fiscalEnabled": saved["fiscalEnabled"],
+                "missing": {
+                    m["documentType"]: len(m["fields"]) for m in dto["missingFields"]
+                },
+            },
+        )
+        conn.commit()
+        return dto
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        put_conn(conn)
+
+
+def _environment_for(est, operation: str) -> str:
+    return est[5] if operation == "NFSE" else est[6]
+
+
 @router.get("/capabilities", response_model=FiscalCapabilitiesDto)
-def capabilities(
+def get_capabilities(
     uf: str = Query(pattern=r"^[A-Z]{2}$"),
     principal: Principal = Depends(require_permission("FISCAL_CONFIG_READ")),
 ):
     conn = get_conn()
     try:
         cur = conn.cursor()
+        now = capabilities.now_utc()
+        data = establishment.load(cur, principal.tenant_id)
+        if data is None:
+            conn.rollback()
+            return capabilities.capabilities_dto(
+                uf,
+                {},
+                set(),
+                now,
+                blocked_reason="Complete o cadastro fiscal da empresa.",
+            )
         est = _establishment(cur, principal.tenant_id)
-        reasons = []
-        if uf != est[1]:
-            reasons.append("UF solicitada não corresponde ao estabelecimento")
-        if not est[2]:
-            reasons.append("código IBGE do município não configurado")
-        if not settings.fiscal_enabled:
-            reasons.append("feature fiscal global desabilitada")
-        reasons.append(provider.reason)
-        return FiscalCapabilitiesDto(
-            uf=uf,
-            version="2026-08-08/inactive",
-            reason="; ".join(reasons),
-            requiresCertificate=True,
+        # NFS-e e produto podem estar em ambientes diferentes: lê cada um no seu.
+        caps = capabilities.current(cur, uf, est[5], now)
+        if est[6] != est[5]:
+            product = capabilities.current(cur, uf, est[6], now)
+            caps = {
+                op: (caps if op == "NFSE" else product).get(op)
+                for op in capabilities.OPERATIONS
+            }
+            caps = {op: cap for op, cap in caps.items() if cap is not None}
+        approved = capabilities.homologated(cur, principal.tenant_id, est[0], uf)
+        conn.rollback()
+        blocked = None
+        if uf != data["uf"]:
+            blocked = "A UF consultada não é a do cadastro fiscal da empresa."
+        elif establishment.missing_fields(data)[DocumentType.NFSE]:
+            blocked = "Complete o cadastro fiscal da empresa."
+        return capabilities.capabilities_dto(
+            uf, caps, approved, now, blocked_reason=blocked
         )
     finally:
+        conn.rollback()
+        put_conn(conn)
+
+
+@router.post("/capabilities/evaluate", response_model=CapabilityEvaluationDto)
+def evaluate_capability(
+    data: EvaluateRequest,
+    principal: Principal = Depends(require_permission("FISCAL_CONFIG_READ")),
+):
+    is_service = isinstance(data, EvaluateServiceRequest)
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        now = capabilities.now_utc()
+        info = establishment.load(cur, principal.tenant_id)
+        est = _establishment(cur, principal.tenant_id) if info else None
+        configured = (
+            _environment_for(est, "NFSE" if is_service else "NFE_55")
+            if est
+            else Environment.RESTRICTED_PRODUCTION.value
+        )
+        if data.environment.value != configured:
+            if data.environment == Environment.PRODUCTION:
+                raise ApiProblem(
+                    403,
+                    "PRODUCTION_NOT_ENABLED",
+                    "A produção ainda não foi liberada para esta empresa.",
+                )
+            raise ApiProblem(
+                422,
+                "VALIDATION_FAILED",
+                "O ambiente não é o configurado para esta empresa.",
+                field_errors=[{"path": "environment", "code": "ENVIRONMENT_MISMATCH"}],
+            )
+        if data.environment == Environment.PRODUCTION and not _production_effective(
+            est
+        ):
+            raise ApiProblem(
+                403,
+                "PRODUCTION_NOT_ENABLED",
+                "A produção ainda não foi liberada para esta empresa.",
+            )
+        uf = info["uf"] if info else None
+        caps, approved, cert_ok, csc_ok = {}, set(), False, False
+        if est and uf:
+            caps = capabilities.current(cur, uf, configured, now)
+            approved = capabilities.homologated(cur, principal.tenant_id, est[0], uf)
+            cur.execute(
+                """SELECT EXISTS(SELECT 1 FROM fiscal_certificates WHERE tenant_id=%s
+                   AND establishment_id=%s AND status='ACTIVE' AND valid_from<=%s AND expires_at>%s)""",
+                (principal.tenant_id, est[0], now, now),
+            )
+            cert_ok = cur.fetchone()[0]
+            cur.execute(
+                """SELECT EXISTS(SELECT 1 FROM fiscal_credentials WHERE tenant_id=%s
+                   AND establishment_id=%s AND credential_type=%s AND status='ACTIVE')""",
+                (principal.tenant_id, est[0], vault.CSC_CREDENTIAL),
+            )
+            csc_ok = cur.fetchone()[0]
+        conn.rollback()
+        ctx = capabilities.Context(
+            tenant_id=principal.tenant_id,
+            establishment_uf=uf,
+            missing=establishment.missing_fields(info)
+            if info
+            else {
+                kind: ["establishment"]
+                for kind in (
+                    DocumentType.NFSE,
+                    DocumentType.NFCE_65,
+                    DocumentType.NFE_55,
+                )
+            },
+            environment=configured,
+            caps=caps,
+            approved=approved,
+            certificate_valid=bool(cert_ok),
+            csc_configured=bool(csc_ok),
+            production_effective=bool(est) and _production_effective(est),
+            now=now,
+        )
+        if is_service:
+            return capabilities.evaluate_service(ctx, data)
+        return capabilities.evaluate_product(ctx, data)
+    finally:
+        conn.rollback()
+        put_conn(conn)
+
+
+@router.get("/catalogs/{catalog_type}/metadata", response_model=CatalogMetadataDto)
+def catalog_metadata(
+    catalog_type: str,
+    principal: Principal = Depends(require_permission("FISCAL_CONFIG_READ")),
+):
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """SELECT type,source_url,version,published_at,valid_until,sha256
+               FROM fiscal_catalog_metadata WHERE type=%s
+               ORDER BY published_at DESC, loaded_at DESC LIMIT 1""",
+            (catalog_type,),
+        )
+        row = cur.fetchone()
+        conn.rollback()
+        # Tipo desconhecido e catálogo sem fonte oficial carregada respondem igual.
+        if not row or not capabilities.is_safe_gov_url(row[1]):
+            raise ApiProblem(404, "NOT_FOUND", "Recurso não encontrado.")
+        return CatalogMetadataDto(
+            type=row[0],
+            source=row[1],
+            version=row[2],
+            publishedAt=row[3],
+            validUntil=row[4],
+            sha256=row[5].strip(),
+        )
+    finally:
+        conn.rollback()
         put_conn(conn)
 
 
