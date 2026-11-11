@@ -1,0 +1,12 @@
+# Gate: `ruff check .` precisa ficar verde. Código novo segue as regras padrão.
+# Os ignores abaixo são dívida legada registrada na F0 do plano fiscal; não crescem:
+# - main.py, cpt_recursos/, fornecedores/: estilo antigo (star import, `;`).
+# - fiscal/sefaz_engine.py: será reescrito como SefazNfceProvider na F11.
+target-version = "py313"
+extend-exclude = ["venv", ".venv", "site-karavaggio"]
+
+[lint.per-file-ignores]
+"main.py" = ["F403", "F405", "E701", "E702", "E401", "E712", "F401", "F811", "F841"]
+"cpt_recursos/*.py" = ["E701", "E702", "F401"]
+"fornecedores/*.py" = ["E701", "E702", "F401"]
+"fiscal/sefaz_engine.py" = ["F401", "F811", "E401", "F841"]

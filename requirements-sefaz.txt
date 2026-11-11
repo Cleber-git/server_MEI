@@ -1,5 +1,2 @@
--r requirements-fiscal.txt
-lxml>=5.3,<7
-signxml>=4,<5
-xmlsec>=1.3.14,<2
-certifi
+# Mantido por compatibilidade com docs antigas: tudo agora está em requirements*.txt.
+-r requirements-dev.txt

@@ -1,9 +1,38 @@
+# Segredos: nunca versionar (.env.example é o modelo, sem valores reais)
 .env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.pem
+*.key
+*.crt
+*.cer
+*.jks
+secrets/
+fiscal-vault/
+
+# Python
 .venv/
 venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
 .coverage
 htmlcov/
+*.egg-info/
+build/
+dist/
+
+# Artefatos e dumps locais (podem conter XML fiscal ou dados de produção)
 fiscal-artifacts/
+*.dump
+*.sql.gz
+backups/
+
+# Editor/SO
+.idea/
+.vscode/
+.DS_Store

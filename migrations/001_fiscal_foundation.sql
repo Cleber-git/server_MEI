@@ -1,4 +1,4 @@
-BEGIN;
+-- Transação aberta e fechada pelo migrate.py (sem BEGIN/COMMIT aqui).
 
 CREATE TABLE IF NOT EXISTS auth_sessions (
     id UUID PRIMARY KEY,
@@ -278,5 +278,3 @@ CREATE TABLE IF NOT EXISTS fiscal_jobs (
     UNIQUE (tenant_id, document_id, job_type, status)
 );
 CREATE INDEX IF NOT EXISTS fiscal_jobs_claim_idx ON fiscal_jobs (status, available_at) WHERE status IN ('QUEUED','RETRY');
-
-COMMIT;
