@@ -24,7 +24,7 @@ from uuid import uuid4
 from fiscal.api import router as fiscal_router
 from fiscal.product_sales import router as product_sales_router
 from fiscal.auth import router as auth_router
-from fiscal.errors import ApiProblem, api_problem_handler
+from fiscal.http import install as install_fiscal_http
 from cpt_recursos.api import router as cpt_recursos_router, initialize_tables as initialize_cpt_recursos
 from fornecedores.api import router as fornecedores_router, initialize_tables as initialize_fornecedores
 try:
@@ -39,7 +39,8 @@ except ImportError:
 # ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 app = FastAPI()
-app.add_exception_handler(ApiProblem, api_problem_handler)
+# Envelope de erro, correlação e headers de segurança de /api/v1 (contrato seção 2).
+install_fiscal_http(app)
 app.include_router(auth_router)
 app.include_router(fiscal_router)
 app.include_router(product_sales_router)
@@ -56,18 +57,12 @@ def get_empresa(validation_uuid: str = Header(alias="validation-uuid")):
 async def validar_empresa(request: Request, call_next):
 
     path = request.url.path.rstrip("/")
-    request.state.correlation_id = request.headers.get("x-correlation-id") or str(uuid4())
 
     # Fiscal/auth v1 have mandatory Bearer/session authorization and must never
-    # fall back to the legacy validation-uuid mechanism.
+    # fall back to the legacy validation-uuid mechanism. Correlação, envelope e
+    # headers de segurança ficam em fiscal.http (instalado acima).
     if path.startswith("/api/v1/fiscal") or path.startswith("/api/v1/auth"):
-        response = await call_next(request)
-        response.headers["X-Correlation-Id"] = request.state.correlation_id
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["Referrer-Policy"] = "no-referrer"
-        response.headers["Cache-Control"] = "no-store"
-        return response
+        return await call_next(request)
         
     rotas_publicas = [
         "/empresa",
@@ -713,7 +708,6 @@ def startup():
 # =====================================================================================
 @app.post("/notas/servico", response_model=NotaServicoResponse)
 def emitir_nota_servico(data: NotaServicoIn, empresa_atual: str = Depends(get_empresa)):
-    print(data)
     if data.empresaUuid != empresa_atual:
         tentar_salvar_historico_nfse(data.empresaUuid, pydantic_to_dict(data), {
             "status": "ERRO_VALIDACAO",
@@ -1945,8 +1939,6 @@ def receber_email(email: receiverEmail):
 
     </div>
 """
-        print(os.getenv("EMAIL_USER"))
-        print(os.getenv("EMAIL_PASSWORD"))
         enviado = email_service.enviar_email(
             email.email,
             "Código de validação de email",
@@ -2323,8 +2315,6 @@ def get_senha(email: receiverEmail):
 
         </div>
     """
-        print(os.getenv("EMAIL_USER"))
-        print(os.getenv("EMAIL_PASSWORD"))
         enviado = email_service.enviar_email(
             email.email,
             "Código para redefinir senha",

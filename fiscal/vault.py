@@ -29,30 +29,17 @@ class LocalEncryptedCertificateVault:
 
     def __init__(self):
         if not settings.local_vault_key:
-            raise ApiProblem(
-                503,
-                "CERTIFICATE_INVALID",
-                "Cofre indisponível",
-                "Cofre/KMS não configurado",
-            )
+            raise ApiProblem(503, "CERTIFICATE_INVALID", "Cofre/KMS não configurado")
         try:
             self.cipher = Fernet(settings.local_vault_key.encode("ascii"))
         except ValueError:
-            raise ApiProblem(
-                503,
-                "CERTIFICATE_INVALID",
-                "Cofre indisponível",
-                "Chave do cofre inválida",
-            )
+            raise ApiProblem(503, "CERTIFICATE_INVALID", "Chave do cofre inválida")
         self.root = Path(settings.local_vault_root).resolve()
 
     def import_pkcs12(self, tenant_id, certificate, password):
         if not certificate or certificate[0] != 0x30:
             raise ApiProblem(
-                422,
-                "CERTIFICATE_INVALID",
-                "Certificado inválido",
-                "Conteúdo não é PKCS#12 válido",
+                422, "CERTIFICATE_INVALID", "Conteúdo não é PKCS#12 válido"
             )
         try:
             key, cert, extras = pkcs12.load_key_and_certificates(
@@ -60,16 +47,12 @@ class LocalEncryptedCertificateVault:
             )
         except (ValueError, TypeError):
             raise ApiProblem(
-                422,
-                "CERTIFICATE_INVALID",
-                "Certificado inválido",
-                "Arquivo ou senha PKCS#12 inválidos",
+                422, "CERTIFICATE_INVALID", "Arquivo ou senha PKCS#12 inválidos"
             )
         if not key or not cert:
             raise ApiProblem(
                 422,
                 "CERTIFICATE_INVALID",
-                "Certificado inválido",
                 "PKCS#12 A1 sem chave privada ou certificado",
             )
         now = datetime.now(timezone.utc)
@@ -77,18 +60,10 @@ class LocalEncryptedCertificateVault:
         expires = cert.not_valid_after_utc
         if valid_from > now:
             raise ApiProblem(
-                422,
-                "CERTIFICATE_INVALID",
-                "Certificado ainda não válido",
-                "O período de validade ainda não começou",
+                422, "CERTIFICATE_INVALID", "O período de validade ainda não começou"
             )
         if expires <= now:
-            raise ApiProblem(
-                422,
-                "CERTIFICATE_EXPIRED",
-                "Certificado expirado",
-                "O certificado está expirado",
-            )
+            raise ApiProblem(422, "CERTIFICATE_EXPIRED", "O certificado está expirado")
         cnpj = None
         for attribute in cert.subject:
             if attribute.oid.dotted_string == CNPJ_OID:
@@ -100,9 +75,7 @@ class LocalEncryptedCertificateVault:
             self.root / hashlib.sha256(tenant_id.encode()).hexdigest()
         ).resolve()
         if self.root not in tenant_dir.parents:
-            raise ApiProblem(
-                500, "INTERNAL_ERROR", "Erro interno", "Destino do cofre inválido"
-            )
+            raise ApiProblem(500, "INTERNAL_ERROR", "Destino do cofre inválido")
         tenant_dir.mkdir(parents=True, exist_ok=True)
         target = (tenant_dir / (reference + ".vault")).resolve()
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
@@ -128,19 +101,14 @@ class LocalEncryptedCertificateVault:
         ).resolve()
         target = (tenant_dir / (reference + ".vault")).resolve()
         if tenant_dir not in target.parents:
-            raise ApiProblem(
-                500, "INTERNAL_ERROR", "Erro interno", "Referência inválida"
-            )
+            raise ApiProblem(500, "INTERNAL_ERROR", "Referência inválida")
         if target.exists():
             revoked = target.with_suffix(".revoked")
             os.replace(target, revoked)
 
     def get_signing_credential(self, tenant_id, reference):
         raise ApiProblem(
-            503,
-            "CAPABILITY_NOT_AVAILABLE",
-            "Assinatura indisponível",
-            "Provider oficial não homologado",
+            503, "CAPABILITY_NOT_AVAILABLE", "Provider oficial não homologado"
         )
 
     def get_metadata(self, tenant_id, reference):

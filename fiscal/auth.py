@@ -53,12 +53,7 @@ def _token_hash(value: str) -> str:
 def _keys() -> dict[str, str]:
     keys = settings.signing_keys()
     if not keys or settings.jwt_active_kid not in keys:
-        raise ApiProblem(
-            503,
-            "INTERNAL_ERROR",
-            "Autenticação indisponível",
-            "Chaves de assinatura não configuradas",
-        )
+        raise ApiProblem(503, "INTERNAL_ERROR", "Chaves de assinatura não configuradas")
     return keys
 
 
@@ -154,7 +149,13 @@ def bearer_login(data: loginIn, request: Request):
         attempt = cur.fetchone()
         if attempt and attempt[2] and attempt[2] > now:
             raise ApiProblem(
-                429, "RATE_LIMITED", "Muitas tentativas", "Tente novamente mais tarde"
+                429,
+                "RATE_LIMITED",
+                "Muitas tentativas. Tente novamente mais tarde.",
+                retryable=True,
+                headers={
+                    "Retry-After": str(max(1, int((attempt[2] - now).total_seconds())))
+                },
             )
         cur.execute(
             """SELECT u.uuid,u.email,u.senhahash,u.nome,u.empresauuid,u.ativo,u.datacadastro,u.ultimologin
@@ -179,21 +180,14 @@ def bearer_login(data: loginIn, request: Request):
                 (rate_key, now, attempts, blocked),
             )
             conn.commit()
-            raise ApiProblem(
-                401,
-                "AUTHENTICATION_REQUIRED",
-                "Credenciais inválidas",
-                "Login ou senha inválidos",
-            )
+            raise ApiProblem(401, "AUTHENTICATION_REQUIRED", "Login ou senha inválidos")
         cur.execute(
             "SELECT uuid,cnpj,razaosocial,nomefantasia,ativo,bloqueado FROM empresa WHERE uuid=%s",
             (user[4],),
         )
         company = cur.fetchone()
         if not company or not company[4] or company[5]:
-            raise ApiProblem(
-                403, "ACCESS_DENIED", "Acesso negado", "Empresa inativa ou bloqueada"
-            )
+            raise ApiProblem(403, "ACCOUNT_BLOCKED", "Empresa inativa ou bloqueada.")
         if upgrade:
             cur.execute(
                 "UPDATE usuariomei SET senhahash=%s WHERE uuid=%s",
@@ -236,17 +230,11 @@ def refresh_session(data: RefreshRequest):
                 )
                 conn.commit()
             raise ApiProblem(
-                401,
-                "AUTHENTICATION_REQUIRED",
-                "Sessão inválida",
-                "Refresh token inválido ou reutilizado",
+                401, "AUTHENTICATION_REQUIRED", "Refresh token inválido ou reutilizado"
             )
         if row[5] or row[4] <= now:
             raise ApiProblem(
-                401,
-                "AUTHENTICATION_REQUIRED",
-                "Sessão inválida",
-                "Sessão revogada ou expirada",
+                401, "AUTHENTICATION_REQUIRED", "Sessão revogada ou expirada"
             )
         cur.execute(
             """SELECT u.ativo,e.ativo,e.bloqueado FROM usuariomei u JOIN empresa e ON e.uuid=u.empresauuid
@@ -256,10 +244,7 @@ def refresh_session(data: RefreshRequest):
         active = cur.fetchone()
         if not active or not active[0] or not active[1] or active[2]:
             raise ApiProblem(
-                401,
-                "AUTHENTICATION_REQUIRED",
-                "Sessão inválida",
-                "Vínculo de usuário ou empresa inativo",
+                401, "AUTHENTICATION_REQUIRED", "Vínculo de usuário ou empresa inativo"
             )
         new_refresh = secrets.token_urlsafe(48)
         cur.execute(
@@ -287,10 +272,7 @@ def current_principal(
 ) -> Principal:
     if not credentials or credentials.scheme.lower() != "bearer":
         raise ApiProblem(
-            401,
-            "AUTHENTICATION_REQUIRED",
-            "Autenticação necessária",
-            "Informe um Bearer token válido",
+            401, "AUTHENTICATION_REQUIRED", "Informe um Bearer token válido"
         )
     token = credentials.credentials
     try:
@@ -310,12 +292,7 @@ def current_principal(
             raise JWTError("wrong token type")
         session_id = UUID(claims["sid"])
     except (JWTError, KeyError, ValueError):
-        raise ApiProblem(
-            401,
-            "AUTHENTICATION_REQUIRED",
-            "Sessão inválida",
-            "Token inválido ou expirado",
-        )
+        raise ApiProblem(401, "AUTHENTICATION_REQUIRED", "Token inválido ou expirado")
     conn = get_conn()
     try:
         cur = conn.cursor()
@@ -329,10 +306,7 @@ def current_principal(
         session = cur.fetchone()
         if not session:
             raise ApiProblem(
-                401,
-                "AUTHENTICATION_REQUIRED",
-                "Sessão inválida",
-                "Sessão ou vínculo inativo",
+                401, "AUTHENTICATION_REQUIRED", "Sessão ou vínculo inativo"
             )
         cur.execute(
             "SELECT permission FROM auth_permissions WHERE user_id=%s AND tenant_id=%s",
@@ -352,7 +326,7 @@ def require_permission(permission: str):
     def dependency(principal: Principal = Depends(current_principal)):
         if permission not in principal.permissions:
             raise ApiProblem(
-                403, "ACCESS_DENIED", "Acesso negado", "Permissão fiscal insuficiente"
+                403, "PERMISSION_DENIED", "Você não tem permissão para esta ação."
             )
         return principal
 

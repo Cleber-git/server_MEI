@@ -31,6 +31,10 @@ from lxml import etree
 import hashlib, base64
 from copy import deepcopy
 
+from .logging import get_logger
+
+log = get_logger(__name__)
+
 
 
 
@@ -183,7 +187,7 @@ def validar_assinatura_xmlsec(root_assinado, cert_pem: bytes):
     context = xmlsec.SignatureContext()
     context.key = key
     context.verify(signature)
-    print("OK -> xmlsec verificou assinatura e digest")
+    log.debug("xmlsec verificou assinatura e digest")
 
 def somente_digitos(valor: str) -> str:
     return re.sub(r"\D", "", valor or "")
@@ -219,7 +223,7 @@ def env_bool(nome: str, default: bool = False) -> bool:
 
 def resolver_verify_tls_sefaz():
     if not env_bool("SEFAZ_TLS_VERIFY", True):
-        print("ATENCAO -> verificacao TLS da SEFAZ desabilitada por SEFAZ_TLS_VERIFY=false")
+        log.warning("verificacao TLS da SEFAZ desabilitada por SEFAZ_TLS_VERIFY=false")
         return False
 
     bundle = os.getenv("SEFAZ_CA_BUNDLE")
@@ -296,7 +300,7 @@ def _certificados_intermediarios_locais():
             with open(nome, "rb") as cert_file:
                 certificados.extend(_carregar_certificado_bytes(cert_file.read()))
         except Exception as exc:
-            print(f"ATENCAO -> nao foi possivel carregar intermediario local {nome}: {exc}")
+            log.warning("nao foi possivel carregar intermediario local", extra={"erro": type(exc).__name__})
     return certificados
 
 def _baixar_intermediarios_aia(certificate):
@@ -321,7 +325,7 @@ def _baixar_intermediarios_aia(certificate):
             response.raise_for_status()
             certificados.extend(_carregar_certificado_bytes(response.content))
         except Exception as exc:
-            print(f"ATENCAO -> nao foi possivel baixar intermediario AIA {url}: {exc}")
+            log.warning("nao foi possivel baixar intermediario AIA", extra={"erro": type(exc).__name__})
 
     return certificados
 
@@ -422,7 +426,7 @@ def load_cert_env():
     if public_from_cert != public_from_key:
         raise Exception("A chave privada não pertence ao certificado informado")
 
-    print("Certificado e chave privada conferem:", public_from_cert == public_from_key)
+    log.debug("certificado e chave privada conferem")
 
     additional_certs = _ordenar_cadeia(certificate, _deduplicar_certificados(
         list(additional_certs or [])
@@ -432,9 +436,9 @@ def load_cert_env():
     ))
 
     if additional_certs:
-        print(f"Cadeia intermediaria carregada: {len(additional_certs)} certificado(s)")
+        log.info("cadeia intermediaria carregada", extra={"certificados": len(additional_certs)})
     else:
-        print("ATENCAO -> nenhum certificado intermediario carregado")
+        log.warning("nenhum certificado intermediario carregado")
 
     return cert_pem, key_pem, certificate, additional_certs
 
@@ -624,9 +628,7 @@ def validar_uf_webservice(root, uf="SP"):
             f"então cUF precisa ser {cuf_esperado}."
         )
 
-    print(
-        f"OK -> cUF {cuf} compatível com endpoint {uf}"
-    )
+    log.debug("cUF compatível com endpoint", extra={"cUF": cuf, "uf": uf})
 
 def urls_nfce(uf: str, tp_amb: str):
     uf = (uf or "").strip().upper()
@@ -890,8 +892,10 @@ def assinar_xml(xml_str: str, cert_pem: bytes, key_pem: bytes, certificate, addi
     
     validar_assinatura_xmlsec(root_assinado, cert_pem)
 
-    print("CERT PFX :", fingerprint_certificado(certificate))
-    print("CERT XML :", fingerprint_xml(root_assinado))
+    log.debug(
+        "fingerprint do certificado confere com o XML",
+        extra={"confere": fingerprint_certificado(certificate) == fingerprint_xml(root_assinado)},
+    )
     xml_final = etree.tostring(
         root_assinado,
         encoding="utf-8",
@@ -913,7 +917,7 @@ def validar_assinatura_signxml_bytes(xml_bytes: bytes, cert_pem: bytes):
         ),
         id_attribute="Id"
     )
-    print("OK -> signxml verificou assinatura e digest")    
+    log.debug("signxml verificou assinatura e digest")
 
 def atualizar_signature_value(root_assinado, key_pem: bytes):
     signed_info = root_assinado.find(f".//{{{DS_NS}}}SignedInfo")
@@ -1037,7 +1041,7 @@ def validar_assinatura_nfce(root_assinado):
             f"DigestValue invalido. XML={digest_xml} calculado={digest_calculado}"
         )
 
-    print("OK -> assinatura NFC-e valida localmente")
+    log.debug("assinatura NFC-e valida localmente")
 
 
 def validar_assinatura_local(root_assinado):
@@ -1072,7 +1076,7 @@ def validar_assinatura_local(root_assinado):
         hashes.SHA1()
     )
 
-    print("OK -> SignatureValue valida SignedInfo")
+    log.debug("SignatureValue valida SignedInfo")
 
     # AQUI ESTÁ A CORREÇÃO:
     # aplicar manualmente enveloped-signature antes do digest
@@ -1098,9 +1102,7 @@ def validar_assinatura_local(root_assinado):
 
     digest_xml = signed_info.findtext(".//DigestValue", namespaces=NS)
 
-    print("Digest XML:      ", digest_xml)
-    print("Digest calculado:", digest_calculado)
-    print("Digest confere:  ", digest_xml == digest_calculado)
+    log.debug("digest conferido", extra={"confere": digest_xml == digest_calculado})
     
   
 def validar_assinatura_signxml(root_assinado, cert_pem):
@@ -1118,7 +1120,7 @@ def validar_assinatura_signxml(root_assinado, cert_pem):
         id_attribute="Id"
     )
 
-    print("OK -> signxml verificou assinatura e digest")
+    log.debug("signxml verificou assinatura e digest")
   
     
 def montar_lote(xml_assinado: str):
@@ -1330,11 +1332,11 @@ def enviar_sefaz(xml_envelope: str, url: str, cert_pem: bytes, key_pem: bytes,
             timeout=60
         )
 
-        print("\n=== DEBUG SEFAZ ===")
-        print("URL:", url)
-        print("Status:", response.status_code)
-        print("Resposta:", response.text[:3000])
-        print("===================\n")
+        # Nunca logar o corpo: a resposta da SEFAZ traz XML com CNPJ/CPF.
+        log.info(
+            "resposta da SEFAZ",
+            extra={"status": response.status_code, "bytes": len(response.content or b"")},
+        )
 
         return response.text
 
@@ -1481,9 +1483,7 @@ def emitir_nfce(xml: str, config=None):
         url_autorizacao = url_autorizacao_nfce(root_debug, config)
         fp_pfx = fingerprint_certificado(certificate)
         fp_xml = fingerprint_xml(root_debug)
-        print(f"Fingerprint PFX: {fp_pfx}")
-        print(f"Fingerprint XML: {fp_xml}")
-        print(f"Batem: {fp_pfx == fp_xml}")
+        log.debug("fingerprint PFX x XML", extra={"confere": fp_pfx == fp_xml})
         
         if fp_pfx != fp_xml:
             raise Exception("CERTIFICADO NO XML NÃO BATE COM O PFX!")
@@ -1596,7 +1596,6 @@ def diagnosticar_assinatura(xml_assinado_str: str):
     # digest_xml = root.findtext(".//ds:DigestValue", namespaces=NS)
     digest_xml = root.findtext(".//DigestValue", namespaces=NS)
 
-    print(f"DigestValue no XML: {digest_xml}")
 
     # 2. Pegar o infNFe e remover a Signature (transform enveloped)
     inf_nfe = root.find(".//nfe:infNFe", namespaces=NS)
@@ -1615,11 +1614,9 @@ def diagnosticar_assinatura(xml_assinado_str: str):
     
     # 4. Calcular SHA1
     digest_calculado = base64.b64encode(hashlib.sha1(c14n).digest()).decode()
-    print(f"DigestValue calculado: {digest_calculado}")
-    print(f"Digest confere: {digest_xml == digest_calculado}")
+    log.debug("digest conferido", extra={"confere": digest_xml == digest_calculado})
     
-    # 5. Mostrar início do c14n para inspeção de namespaces
-    print(f"Início do C14N:\n{c14n[:500].decode()}")
+    # 5. O C14N não é logado: contém o XML da nota (CNPJ/CPF, endereço).
 
 def remove_ds(nota_xml):
     return nota_xml.replace("ds:", "")

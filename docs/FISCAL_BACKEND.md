@@ -12,7 +12,7 @@ Permissões são grants em `auth_permissions`: `FISCAL_CONFIG_READ`, `FISCAL_CON
 
 ## Contrato fiscal v1
 
-O contrato normativo gerado está em `openapi.json`. Todos os endpoints ficam em `/api/v1/fiscal`. DTOs mantêm camelCase e enums do Android. Erros são `application/problem+json` com código estável e `correlationId`. Criação exige `Idempotency-Key`, retorna 202 somente quando persistida e enfileirada e usa JSON canônico + SHA-256. Produção é recusada independentemente do boolean do cliente.
+O contrato normativo gerado está em `openapi.json`. Todos os endpoints ficam em `/api/v1/fiscal`. DTOs mantêm camelCase e enums do Android. Erros seguem o envelope `{"error":{…}}` do contrato (seção 2), em `application/json` — ver “Erros, correlação e logs” abaixo. Criação exige `Idempotency-Key`, retorna 202 somente quando persistida e enfileirada e usa JSON canônico + SHA-256. Produção é recusada independentemente do boolean do cliente.
 
 Queries incluem `tenant_id` da sessão. Recursos de outro tenant respondem como inexistentes. Jobs carregam tenant, documento e correlação. A constraint impede `AUTHORIZED` sem série, número, chave, protocolo, timestamp e artefato XML; o domínio também exige SHA-256 válido.
 
@@ -47,3 +47,25 @@ A partir da F0 (2026-11-11) quem manda é o contrato do app: `Caltech-Mei/docs/f
 - Antes de qualquer migration em produção: `pg_dump --format=custom --no-owner --file=backup-$(date +%Y%m%d-%H%M).dump "$DATABASE_URL"` (URL externa do Render, guardada fora do repo) e conferência do arquivo com `pg_restore --list`.
 - Bloqueio conhecido: a `001` referencia `empresa(uuid)` e `usuariomei(uuid)`, que no DDL legado do `main.py` não têm `UNIQUE`; a correção aditiva é da F1 e exige inspecionar o schema real (somente leitura) antes.
 - Não habilite produção sem homologação e aprovação registradas.
+
+## Erros, correlação e logs (F1, 2026-11-11)
+
+- **Instalação:** `fiscal.http.install(app)` (chamado no `main.py`) registra os handlers e o middleware de `/api/v1/**`. As rotas legadas continuam com o formato do FastAPI (`{"detail": …}`) e com o 500 em texto puro.
+- **Envelope:** `{"error":{"code","message","retryable","correlationId","officialCode","officialMessage","fieldErrors"?,"reasons"?}}`, em `application/json`, para:
+  - `ApiProblem(status, code, message, *, field_errors, reasons, retryable, official_code, official_message, headers)`: códigos da seção 2.1;
+  - `HTTPException`: 404 `NOT_FOUND`, 405 `METHOD_NOT_ALLOWED` etc.;
+  - `RequestValidationError`: 422 `VALIDATION_FAILED`, com `fieldErrors` só de caminho e tipo (nunca o valor recebido);
+  - exceção genérica: 500 `INTERNAL_ERROR` com mensagem genérica. O traceback só vai para o log redigido.
+- **Correlação:** `X-Correlation-Id` só é aceito se for UUID. Senão, o servidor gera outro. Ele volta sempre no header e no envelope e entra em todo log (`contextvars`). Headers fixos em `/api/v1`: `nosniff`, `DENY`, `no-referrer` e `no-store`.
+- **JSONB:** sempre via `psycopg2.extras.Json` (o `_audit` gravava `dict` cru e dava 500). Em `fiscal/__init__.py` fica registrado o adaptador de `uuid.UUID` para parâmetro: sem ele, `POST /api/v1/auth/login` dava 500 (`can't adapt type 'UUID'`). A leitura continua devolvendo `str`.
+- **Logs (`fiscal/logging.py`):**
+  - JSON por linha no logger `fiscal` (`get_logger(__name__)`).
+  - `RedactingFilter` no handler e nos loggers `fiscal.*`, `uvicorn.error` e `uvicorn.access`.
+  - Redige mensagem, argumentos, campos extras e traceback: CPF, CNPJ (inclusive o alfanumérico), e-mail, XML, PEM, base64 longo, JWT, Bearer, tokens opacos e `senha=`/`password:`/`csc…`/`token…`.
+  - UUID e SHA-256 hex continuam legíveis.
+  - Não há mais `print` em `fiscal/`. No `sefaz_engine.py`, o corpo da resposta da SEFAZ e o C14N deixaram de ser impressos. Só vão status e tamanho.
+  - Saíram do `main.py` os `print` de `EMAIL_USER`/`EMAIL_PASSWORD` e do payload da NFS-e legada.
+- **Testes:**
+  - `tests/test_fiscal_logging.py`: redação, pipeline configurado sem CNPJ completo e filtro do uvicorn.
+  - `tests/test_fiscal_http.py`: envelope em 401/403/404/405/422/429/500, correlação, legado intacto e, no Postgres local, tenants A/B (404 sem revelar existência, auditoria em JSONB e upgrade de senha em texto puro para bcrypt).
+  - O `TestClient` do Starlette 0.36 não roda com o `httpx` 0.28 fixado, por isso os testes usam `httpx.ASGITransport`.

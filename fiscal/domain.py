@@ -82,7 +82,6 @@ def assert_transition(current: FiscalStatus, target: FiscalStatus) -> None:
         raise ApiProblem(
             409,
             "INVALID_STATE_TRANSITION",
-            "Transição fiscal inválida",
             f"Transição {current.value} para {target.value} não permitida",
         )
 

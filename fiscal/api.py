@@ -16,6 +16,8 @@ from fastapi import (
     UploadFile,
 )
 
+from psycopg2.extras import Json
+
 from db import get_conn, put_conn
 from .auth import Principal, require_permission
 from .config import settings
@@ -52,7 +54,6 @@ def _establishment(cur, tenant_id):
         raise ApiProblem(
             422,
             "FISCAL_CONFIGURATION_INCOMPLETE",
-            "Configuração fiscal incompleta",
             "Cadastre um estabelecimento fiscal válido",
         )
     return row
@@ -80,7 +81,8 @@ def _audit(
             str(resource_id) if resource_id else None,
             correlation_id,
             result,
-            metadata or {},
+            # dict cru em JSONB quebra no psycopg2 (can't adapt type 'dict').
+            Json(metadata or {}),
         ),
     )
 
@@ -146,10 +148,7 @@ def put_config(
         and "FISCAL_PRODUCTION_ENABLE" not in principal.permissions
     ):
         raise ApiProblem(
-            403,
-            "ACCESS_DENIED",
-            "Acesso negado",
-            "Permissão para solicitar produção ausente",
+            403, "PERMISSION_DENIED", "Você não tem permissão para esta ação."
         )
     conn = get_conn()
     try:
@@ -159,7 +158,6 @@ def put_config(
             raise ApiProblem(
                 409,
                 "HOMOLOGATION_REQUIRED",
-                "Homologação obrigatória",
                 "A ativação exige checklist, homologação e aprovação operacional no servidor",
             )
         cur.execute(
@@ -235,20 +233,10 @@ async def import_certificate(
         "application/pkcs12",
         "application/octet-stream",
     }:
-        raise ApiProblem(
-            415,
-            "CERTIFICATE_INVALID",
-            "Certificado inválido",
-            "Content-Type PKCS#12 obrigatório",
-        )
+        raise ApiProblem(415, "CERTIFICATE_INVALID", "Content-Type PKCS#12 obrigatório")
     content = await file.read(settings.max_upload_bytes + 1)
     if len(content) > settings.max_upload_bytes:
-        raise ApiProblem(
-            413,
-            "CERTIFICATE_INVALID",
-            "Certificado inválido",
-            "Arquivo excede o limite",
-        )
+        raise ApiProblem(413, "PAYLOAD_TOO_LARGE", "Arquivo maior que o permitido.")
     conn = get_conn()
     try:
         cur = conn.cursor()
@@ -272,7 +260,6 @@ async def import_certificate(
             raise ApiProblem(
                 422,
                 "CERTIFICATE_HOLDER_MISMATCH",
-                "Titular incompatível",
                 "Certificado não pertence ao estabelecimento",
             )
         cert_id = uuid4()
@@ -364,12 +351,7 @@ def revoke_certificate(
     principal: Principal = Depends(require_permission("FISCAL_CERTIFICATE_MANAGE")),
 ):
     if confirmation != "REVOKE":
-        raise ApiProblem(
-            422,
-            "VALIDATION_ERROR",
-            "Confirmação obrigatória",
-            "Envie X-Confirm-Revocation: REVOKE",
-        )
+        raise ApiProblem(422, "VALIDATION_ERROR", "Envie X-Confirm-Revocation: REVOKE")
     conn = get_conn()
     try:
         cur = conn.cursor()
@@ -379,12 +361,7 @@ def revoke_certificate(
         )
         row = cur.fetchone()
         if not row:
-            raise ApiProblem(
-                404,
-                "TENANT_RESOURCE_NOT_FOUND",
-                "Certificado não encontrado",
-                "Recurso não encontrado",
-            )
+            raise ApiProblem(404, "NOT_FOUND", "Recurso não encontrado.")
         LocalEncryptedCertificateVault().revoke(principal.tenant_id, row[0])
         cur.execute(
             "UPDATE fiscal_certificates SET status='REVOKED',revoked_at=NOW() WHERE id=%s AND tenant_id=%s",
@@ -418,7 +395,6 @@ def create_document(
         raise ApiProblem(
             400,
             "IDEMPOTENCY_KEY_REQUIRED",
-            "Idempotência obrigatória",
             "Informe Idempotency-Key imprevisível e não vazio",
         )
     payload = data.model_dump(mode="json")
@@ -431,21 +407,14 @@ def create_document(
             raise ApiProblem(
                 409,
                 "PRODUCTION_DISABLED",
-                "Produção desabilitada",
                 "Produção não foi habilitada pelos gates do servidor",
             )
         if not settings.fiscal_enabled or not est[3]:
-            raise ApiProblem(
-                409,
-                "CAPABILITY_NOT_AVAILABLE",
-                "Capacidade indisponível",
-                provider.reason,
-            )
+            raise ApiProblem(409, "CAPABILITY_NOT_AVAILABLE", provider.reason)
         if not settings.local_vault_key or not settings.kms_key_reference:
             raise ApiProblem(
                 409,
                 "FISCAL_CONFIGURATION_INCOMPLETE",
-                "Configuração fiscal incompleta",
                 "Cofre/KMS para payload fiscal não configurado",
             )
         cur.execute(
@@ -459,7 +428,6 @@ def create_document(
                 raise ApiProblem(
                     409,
                     "IDEMPOTENCY_KEY_REUSED",
-                    "Chave de idempotência reutilizada",
                     "A chave já foi usada com outro payload",
                 )
             cur.execute(
@@ -501,10 +469,7 @@ def create_document(
             ).encrypt(canonical_json(payload))
         except ValueError as exc:
             raise ApiProblem(
-                409,
-                "FISCAL_CONFIGURATION_INCOMPLETE",
-                "Configuração fiscal incompleta",
-                "Chave do cofre fiscal inválida",
+                409, "FISCAL_CONFIGURATION_INCOMPLETE", "Chave do cofre fiscal inválida"
             ) from exc
         cur.execute(
             """INSERT INTO fiscal_document_payloads(document_id,tenant_id,canonical_request_ciphertext,
@@ -559,12 +524,7 @@ def get_document(
         )
         row = cur.fetchone()
         if not row:
-            raise ApiProblem(
-                404,
-                "TENANT_RESOURCE_NOT_FOUND",
-                "Documento não encontrado",
-                "Recurso não encontrado",
-            )
+            raise ApiProblem(404, "NOT_FOUND", "Recurso não encontrado.")
         return _document(row)
     finally:
         put_conn(conn)
@@ -623,15 +583,8 @@ def cancel_document(
     principal: Principal = Depends(require_permission("FISCAL_DOCUMENT_CANCEL")),
 ):
     if not idempotency_key:
-        raise ApiProblem(
-            400,
-            "IDEMPOTENCY_KEY_REQUIRED",
-            "Idempotência obrigatória",
-            "Informe Idempotency-Key",
-        )
-    raise ApiProblem(
-        409, "CAPABILITY_NOT_AVAILABLE", "Cancelamento indisponível", provider.reason
-    )
+        raise ApiProblem(400, "IDEMPOTENCY_KEY_REQUIRED", "Informe Idempotency-Key")
+    raise ApiProblem(409, "CAPABILITY_NOT_AVAILABLE", provider.reason)
 
 
 @router.post("/documents/{document_id}/retry", status_code=202)
@@ -639,9 +592,7 @@ def retry_document(
     document_id: UUID,
     principal: Principal = Depends(require_permission("FISCAL_DOCUMENT_CREATE")),
 ):
-    raise ApiProblem(
-        409, "CAPABILITY_NOT_AVAILABLE", "Reconciliação indisponível", provider.reason
-    )
+    raise ApiProblem(409, "CAPABILITY_NOT_AVAILABLE", provider.reason)
 
 
 @router.get("/documents/{document_id}/xml")
@@ -651,12 +602,7 @@ def get_artifact(
     principal: Principal = Depends(require_permission("FISCAL_DOCUMENT_READ")),
 ):
     # Deliberately uniform until private encrypted object storage is configured.
-    raise ApiProblem(
-        404,
-        "ARTIFACT_NOT_AVAILABLE",
-        "Artefato indisponível",
-        "Artefato oficial não disponível",
-    )
+    raise ApiProblem(404, "NOT_FOUND", "Recurso não encontrado.")
 
 
 @router.get("/internal/readiness", include_in_schema=False)
