@@ -24,9 +24,10 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from . import documents, providers, vault
+from . import documents, establishment, providers, vault
 from .config import settings
 from .domain import FiscalStatus, is_complete_authorization
+from .errors import ApiProblem
 from .logging import get_logger
 from .providers import DocumentContext, Outcome, OutcomeKind
 
@@ -110,13 +111,49 @@ def _call(fn, *args) -> Outcome:
         return Outcome(OutcomeKind.TIMEOUT)
 
 
-def _context(cur, doc: documents.Doc, ring) -> DocumentContext:
+def _signing_material(cur, doc: documents.Doc, ring) -> dict:
+    """Cadastro + credencial do cofre, conferida contra o titular **antes** de assinar (F8).
+
+    Falha vira ``credential_error`` (código estável) e o provider não transmite nada.
+    """
+    issuer = establishment.load(cur, doc.tenant_id)
+    if issuer is None:
+        return {"credential_error": "ESTABLISHMENT_INCOMPLETE"}
+    try:
+        credential = vault.get_signing_credential(cur, doc.tenant_id, ring)
+    except ApiProblem as problem:
+        return {"issuer": issuer, "credential_error": problem.code}
+    except vault.VaultIntegrityError:
+        log.error("fiscal_signing_credential_unreadable", extra={"documentId": doc.id})
+        return {"issuer": issuer, "credential_error": "CERTIFICATE_INVALID"}
+    holder = vault.read_holder(credential.certificate)
+    cnpj = establishment.normalize_cnpj(issuer.get("cnpj"))
+    own_cnpj = holder is not None and holder.kind == "CNPJ" and holder.tax_id == cnpj
+    own_cpf = (
+        holder is not None
+        and holder.kind == "CPF"
+        and issuer.get("taxRegime") == "MEI"
+        and holder.tax_id == (issuer.get("responsibleCpf") or "")
+    )
+    if not (own_cnpj or own_cpf):
+        return {"issuer": issuer, "credential_error": "CERTIFICATE_HOLDER_MISMATCH"}
+    return {"issuer": issuer, "credential": credential}
+
+
+def _context(cur, doc: documents.Doc, ring, provider=None) -> DocumentContext:
     payload = documents.open_json(cur, doc.tenant_id, doc.payload_blob_id, ring)
     substituted = None
     if doc.substitutes_document_id:
         original = documents.load(cur, doc.tenant_id, doc.substitutes_document_id)
         substituted = original.official_key if original else None
+    material = (
+        _signing_material(cur, doc, ring)
+        if getattr(provider, "needs_issuer", False)
+        else {}
+    )
     return DocumentContext(
+        created_at=doc.created_at,
+        **material,
         id=doc.id,
         tenant_id=doc.tenant_id,
         document_type=doc.document_type,
@@ -179,7 +216,7 @@ def _process_submit(conn, job: Job, owner: str, provider_for) -> None:
         return
     ring = vault.keyring()
     provider = provider_for(doc.document_type)
-    context = _context(cur, doc, ring)
+    context = _context(cur, doc, ring, provider)
     corr = job.correlation_id
     query_first = doc.outcome_uncertain or doc.status in (S.SUBMITTED, S.PROCESSING)
     if doc.status == S.ERROR_RETRYABLE:
@@ -430,7 +467,7 @@ def _process_cancel(conn, job: Job, owner: str, provider_for) -> None:
         return
     ring = vault.keyring()
     provider = provider_for(doc.document_type)
-    context = _context(cur, doc, ring)
+    context = _context(cur, doc, ring, provider)
     reason = documents.open_json(cur, doc.tenant_id, doc.cancel_reason_blob_id, ring)[
         "reason"
     ]

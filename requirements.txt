@@ -1,4 +1,4 @@
-﻿fastapi==0.110.0
+fastapi==0.110.0
 uvicorn[standard]==0.29.0
 psycopg2-binary==2.9.10
 SQLAlchemy==2.0.39
@@ -20,3 +20,7 @@ signxml==4.5.1
 # xmlsec precisa da mesma libxml2 do lxml; validado junto com lxml==6.1.3.
 xmlsec==1.3.18
 certifi==2026.10.23
+# DANFSe gerado no servidor (F8): a API de DANFSe do ADN foi suspensa em 03/08/2026 (NT 008 v1.02).
+reportlab==4.2.5
+pillow==11.0.0
+chardet==5.2.0

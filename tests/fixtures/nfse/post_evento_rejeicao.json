@@ -1,0 +1,12 @@
+{
+  "tipoAmbiente": 2,
+  "versaoAplicativo": "SefinNac_Pre_1.0",
+  "dataHoraProcessamento": "2026-11-12T11:00:00-03:00",
+  "erros": [
+    {
+      "Codigo": "E1235",
+      "Descricao": "Pedido de registro de evento rejeitado (simulação).",
+      "Complemento": "chave 3550308"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "tipoAmbiente": 2,
+  "versaoAplicativo": "SefinNac_Pre_1.0",
+  "dataHoraProcessamento": "2026-11-12T10:00:05-03:00",
+  "erros": [
+    {
+      "Codigo": "E0014",
+      "Descricao": "Conjunto de Série, Número, Código do Município Emissor e CNPJ/CPF informado nesta DPS já existe em uma NFS-e gerada a partir de uma DPS enviada anteriormente.",
+      "Complemento": null
+    }
+  ]
+}

@@ -6,8 +6,9 @@ estado: quem aplica a máquina de estados é o worker (``fiscal.worker``).
 - ``UnavailableProvider`` (padrão): nunca transmite e nunca simula autorização.
 - ``FakeProvider``: autorizador em memória para testes e para o backend local da F9
   (``FISCAL_PROVIDER=fake``). Recusa ``PRODUCTION`` e marca tudo como falso.
-- ``SefinNacionalProvider`` (F8), ``SefazNfceProvider`` (F11) e o da NF-e (F13) entram
-  aqui implementando o mesmo protocolo.
+- ``SefinNacionalProvider`` (F8, ``fiscal.sefin``, ``FISCAL_PROVIDER=sefin``): NFS-e pela SEFIN
+  Nacional, só em produção restrita. ``SefazNfceProvider`` (F11) e o da NF-e (F13) entram
+  implementando o mesmo protocolo.
 
 Regras do protocolo:
 
@@ -70,8 +71,13 @@ class DocumentContext:
     payload: dict
     official_key: str | None = None
     substitutes_official_key: str | None = None
+    # F8: só para providers com ``needs_issuer`` (o worker carrega do cadastro e do cofre).
+    created_at: datetime | None = None
+    issuer: dict | None = None
+    credential: object | None = None
+    credential_error: str | None = None
 
-    def __repr__(self) -> str:  # sem payload
+    def __repr__(self) -> str:  # sem payload, cadastro nem credencial
         return f"DocumentContext(id={self.id}, type={self.document_type})"
 
 
@@ -266,6 +272,7 @@ class FakeProvider:
 
 _override: FiscalProvider | None = None
 _fake_singleton: FakeProvider | None = None
+_sefin_singleton = None
 
 
 def set_provider(provider: FiscalProvider | None) -> None:
@@ -275,8 +282,8 @@ def set_provider(provider: FiscalProvider | None) -> None:
 
 
 def provider_for(document_type: str) -> FiscalProvider:
-    """Provider de cada tipo. Sem provider real (F8/F11/F13), nada é transmitido."""
-    global _fake_singleton
+    """Provider de cada tipo. Sem provider real para o tipo, nada é transmitido."""
+    global _fake_singleton, _sefin_singleton
     if _override is not None:
         return _override
     from .config import settings
@@ -285,4 +292,13 @@ def provider_for(document_type: str) -> FiscalProvider:
         if _fake_singleton is None:
             _fake_singleton = FakeProvider()
         return _fake_singleton
+    if settings.fiscal_provider == "sefin" and document_type == "NFSE":
+        if _sefin_singleton is None:
+            from .sefin import SefinNacionalProvider
+
+            _sefin_singleton = SefinNacionalProvider(
+                timeout_seconds=settings.nfse_timeout_seconds,
+                cafile=settings.nfse_ca_file,
+            )
+        return _sefin_singleton
     return UnavailableProvider()

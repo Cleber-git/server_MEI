@@ -229,7 +229,7 @@ def sanitize_official(code: str | None, message: str | None):
     """Código e texto oficiais sem PII nem marcação, com tamanho limitado."""
     clean_code = None
     if code:
-        clean_code = re.sub(r"[^A-Za-z0-9_.-]", "", str(code))[:20] or None
+        clean_code = re.sub(r"[^A-Za-z0-9_.-]", "", str(code))[:40] or None
     clean_message = None
     if message:
         text = re.sub(r"<[^>]*>", " ", str(message))

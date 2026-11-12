@@ -1,0 +1,83 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<NFSe xmlns="http://www.sped.fazenda.gov.br/nfse" versao="1.01"><infNFSe Id="NFS35503082211222333000181000000000000126111234567897"><xLocEmi>São Paulo</xLocEmi><xLocPrestacao>São Paulo</xLocPrestacao><nNFSe>1</nNFSe><cLocIncid>3550308</cLocIncid><xLocIncid>São Paulo</xLocIncid><xTribNac>Análise e desenvolvimento de sistemas.</xTribNac><verAplic>SefinNac_Pre_1.0</verAplic><ambGer>2</ambGer><tpEmis>1</tpEmis><procEmi>1</procEmi><cStat>107</cStat><dhProc>2026-11-12T10:00:00-03:00</dhProc><nDFSe>1</nDFSe><emit><CNPJ>11222333000181</CNPJ><xNome>EMPRESA TESTE MEI</xNome><enderNac><xLgr>Praça da Sé</xLgr><nro>100</nro><xBairro>Sé</xBairro><cMun>3550308</cMun><UF>SP</UF><CEP>01001000</CEP></enderNac></emit><valores><vLiq>1250.00</vLiq></valores><DPS versao="1.01"><infDPS Id="DPS355030821122233300018100001000000000000001"><tpAmb>2</tpAmb><dhEmi>2026-11-12T10:00:00-03:00</dhEmi><verAplic>CaltechMEI-1.0</verAplic><serie>1</serie><nDPS>1</nDPS><dCompet>2026-11-12</dCompet><tpEmit>1</tpEmit><cLocEmi>3550308</cLocEmi><prest><CNPJ>11222333000181</CNPJ><regTrib><opSimpNac>2</opSimpNac><regEspTrib>0</regEspTrib></regTrib></prest><toma><CPF>52998224725</CPF><xNome>Maria Cliente</xNome><email>maria@example.com</email></toma><serv><locPrest><cLocPrestacao>3550308</cLocPrestacao></locPrest><cServ><cTribNac>010101</cTribNac><xDescServ>Desenvolvimento de site institucional
+Entrega em 2 etapas</xDescServ></cServ></serv><valores><vServPrest><vServ>1250.00</vServ></vServPrest><trib><tribMun><tribISSQN>1</tribISSQN><tpRetISSQN>1</tpRetISSQN></tribMun><totTrib><indTotTrib>0</indTotTrib></totTrib></trib></valores></infDPS><Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
+<SignedInfo>
+<CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>
+<SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>
+<Reference URI="#DPS355030821122233300018100001000000000000001">
+<Transforms>
+<Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>
+<Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>
+</Transforms>
+<DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+<DigestValue>B1564t+E3emVYLOXvr5xHhRlS/GWkPi3Iuq0NQ546rw=</DigestValue>
+</Reference>
+</SignedInfo>
+<SignatureValue>lNi6PMIWZhYmMpD+vPTia10GJC3uGy2RG62lv3fQWb2l5YQSGekyAslCgziyoqqC
+EDIXpxcQLjYXahaimvnEZxRcR7SjfT4LZ8e3NjkVYqSQfFOFPN8gJBsHd43RtbPV
+bpWinUK5HHNYGfnCav8FT33X06c565R3usIp4edZMedM9fgzUI2X72bra37q3XgO
+r7j9kSLDVhGiOzLKkOm3JzcNYk/za4U6G99r6fZBtdHG0pwzNUZP5MLXr6OqqPBl
+oCDaL0wNur4icdOxV+Fqe7CJfKxQ2YxHJaWQjFsFGFBJhxxhQixL4/X0Zfnnwl7J
+xyBNLJITkYDPfqrceEHyXQ==</SignatureValue>
+<KeyInfo>
+<X509Data>
+<X509Certificate>
+MIICwDCCAaigAwIBAgIUQNF+6WksuNIcPXJI3tphwKmZLqswDQYJKoZIhvcNAQEL
+BQAwGjEYMBYGA1UEAwwPTVVOSUNJUElPIFRFU1RFMB4XDTI2MTExMTEzNTA0NFoX
+DTM2MTEwOTEzNTA0NFowGjEYMBYGA1UEAwwPTVVOSUNJUElPIFRFU1RFMIIBIjAN
+BgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnxFDVnjkPSrHzPxWn8UlFo+Vmdx+
+F7AE9LjVUZVCinYYMBgOv6KQ4NS61Yb/7ih7Tojkr+AmXPFkjhHdwVLtO8uS3cAh
+PKoa1k77jY1HTtIWS2BVeBwwDrAzYKkBxC5oKRgtq8HAc73asPektQMiavV2To13
+m/DMbkdEYRSCQP9VkM/W9HGr6/lbOwbEk9Kr9+WOM5XTAOKInakc5SBfMeleG7xH
+nCQzqv3sSusOdi/qS0qIoaFp9OkDguwqiWmMiKRhYAaaZr0rBd4X1JFCOU3eBAhf
+NSiWqF4wIDcDXE6S18GKDfwU2CqibuWm2bjaLugZlXQP74QzPuqVFxlfrQIDAQAB
+MA0GCSqGSIb3DQEBCwUAA4IBAQBrlYAiTZ4OkhVR5fgkdRfOgCBJEJ9CE/tqPFNZ
+kEB+lwlfgb9/A6mNhNHRhfDWhFSehnZmP5beXhiZ7Eb4dxt7KAh9gKwPArj1fuSl
+VTH9U923amiqtGrHW/HUPB0kRiu/IxSsoGkV2ala92kIAA/ooshUFVyxesKQWG9k
+Jfu2Y9hDBiyKp0nluFkvsY88atrJ4RFek/+IO8OKRZls9aOVz5FR4M1+ChFsGhyx
+JneNEutfyhmm7cDqLiNNCWPqONbklglIiVBEQIEE3k3Nyzn7cVlICTd0HfFyAFGc
+CWxu/+1YllyixF0Gn1WWs+C4zMycHZ68sdaDJbpKmA9coGhN
+</X509Certificate>
+</X509Data>
+</KeyInfo>
+</Signature></DPS></infNFSe><Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
+<SignedInfo>
+<CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>
+<SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>
+<Reference URI="#NFS35503082211222333000181000000000000126111234567897">
+<Transforms>
+<Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>
+<Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>
+</Transforms>
+<DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+<DigestValue>h9L6hH/lIP/B+2mEGCkLZOHDU/73WlHdBBsD4FOe3dg=</DigestValue>
+</Reference>
+</SignedInfo>
+<SignatureValue>DGFboWIokbseZXddv4VB1Lt3ps1eXnGZSHFi4Gak4ndxW/XooQv2DLq3ca04+ROF
+1tvGgXcksm++8H99+LnzoXDDcEKFAA/ly7sdhGja1GjImoqOtfwRl/yz8/xFV1lQ
++JuDz2gHgcShBXDemEDW6gGAq99tQ0fZ9zVk5Pv5uTTv+UYdja7t5TNgVYZXkKwb
+ZH0tKkzx77Kwa4/8zGhrgQ3js40g+kC3aKM5WdeWuXkB4OrQOJLpDnQ+m4IMtuQw
+m6fSkbqvQlSATFXw19XWh3Pz8dLkcIxkkFn3NaO3S9tbNG+1pmq0M2j/0GJvjiLD
+6Vl0SabF3ToCXn3zFWtNHg==</SignatureValue>
+<KeyInfo>
+<X509Data>
+<X509Certificate>
+MIICwDCCAaigAwIBAgIUQkA40M352aTPIjUesqAQcId2D+IwDQYJKoZIhvcNAQEL
+BQAwGjEYMBYGA1UEAwwPTVVOSUNJUElPIFRFU1RFMB4XDTI2MTExMTEzNTA0NFoX
+DTM2MTEwOTEzNTA0NFowGjEYMBYGA1UEAwwPTVVOSUNJUElPIFRFU1RFMIIBIjAN
+BgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAv5mO/TXuKUlCMazZHD33RBUn9f/H
+AqLvLaKOrJuf9LchdCiMqF/vxrgeja6LfD1Rl7dov8DMSgKa5cl2wXkowACfcLqm
+Iw8UgihpsghaLTh2n3xCC2IQ6ruGvTStECX9blo3Xe/Hn71YNDbF/xwS8Rn1bxJV
+53CyA1Pn5ClueTNSz87AoJEJ//Y/jYQ8o6KfrW5yL7yw6RnKEup1N+A2QH2e4ZEI
+MJEyDPlyLp/J5ZQ8S6rfZR6OWET72CWPKCcEO9nutAS1GDfEH8Utw0gwmvzRb2Ar
+FKP8kvfFcJEceKeDikw/jA5B4sSo7NL8Jy5Mk7AYaghbau+r+bsj3IfB2QIDAQAB
+MA0GCSqGSIb3DQEBCwUAA4IBAQBAQvjznaiV4svvCfKIAHX+ZiwiauMftWsBR5fr
+uMy62f4EAoJNspEaG2z3VxI21/PRtvQdhgqMg+RPHVrYR/f+ZWj8mE9s/fgqwi/F
+XyyctbFG+H2AI2VQiA38vV+XRcyYwHrNC9jqYQdrXvkFF0lCCNp5NnAcoJJXOxV4
+WyFS3H9fFEAihE01MJcNwNsv4WMN2ylTs9BudQzJbKWToBwrT+yciwy4eQcwOyyW
+7e5KBI3vGsSGshk2dOnpzwMBPoiIbWAispfU2J8WjpTqmCQfJiFrH4VYGgdyj4GL
+eiihxDhH9uy1gE9aQF+0Jvb4mJiqLzizKm1m4XJMqTYtOw7y
+</X509Certificate>
+</X509Data>
+</KeyInfo>
+</Signature></NFSe>

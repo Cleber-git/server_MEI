@@ -88,8 +88,65 @@ Contrato: seção 4.4 de `Caltech-Mei/docs/fiscal-api-contract-v1.md`. Código e
 - **Banco (`007_fiscal_document_engine.sql`):** finalidades `DOCUMENT_PAYLOAD`/`ARTIFACT` no cofre; colunas novas em `fiscal_documents` (payload, motivo do cancelamento, `xml_sha256`, `outcome_uncertain`, `official_code`, datas, `substitutes_document_id`); CHECK `NOT VALID` de evidência completa em `AUTHORIZED`/`CANCEL_PENDING`/`CANCELLED` (inclui `xml_sha256` com 64 hex) e de status conhecido; índices únicos parciais da intenção por venda e da substituição; `fiscal_artifacts` imutável por trigger; colunas de evento e índices de job.
 - **`db.py`:** o pool passou a `ThreadedConnectionPool` (o `SimpleConnectionPool` não é seguro entre threads, e agora há a do worker além das do FastAPI).
 
+## NFS-e pela SEFIN Nacional (F8, 2026-11-12)
+
+Código em `fiscal/nfse.py` (DPS, XSD, assinatura, GZip+Base64 e leitura da NFS-e), `fiscal/sefin.py` (`SefinNacionalProvider`) e `fiscal/danfse.py` (DANFSe). Os testes ficam em `tests/test_nfse_f8.py`, com a SEFIN falsa em `tests/sefin_fake.py` e as fixtures em `tests/fixtures/nfse/`. Nenhum teste usa rede.
+
+- **Ligar:** `FISCAL_PROVIDER=sefin` usa a SEFIN para `NFSE`. Os outros tipos continuam `unavailable`.
+  - Ambiente **travado em produção restrita**: o módulo só conhece `https://sefin.producaorestrita.nfse.gov.br/API/SefinNacional`, e documento em `PRODUCTION` vira `NOT_SENT` (`PRODUCTION_LOCKED`).
+  - Envs opcionais: `FISCAL_NFSE_TIMEOUT_SECONDS` (padrão 30, limitado a 5–60, abaixo do lease de 120 s) e `FISCAL_NFSE_CA_FILE` (CA para validar o servidor da SEFIN; padrão é o repositório do sistema). Se o arquivo não existir, o servidor não sobe.
+- **Leiaute:** XSD oficial `1.01` (pacote de 09/02/2026) versionado byte a byte em `fiscal/xsd/nfse/`, com fonte, data e SHA-256 em `SOURCE.md` e `SHA256SUMS` (`.gitattributes` tira esses arquivos do `diff --check`).
+  - O XSD usa `^…$` em `TSSerieDPS`. Em regex de XML Schema esses sinais são literais e o libxml2 recusaria toda série. A correção é feita só em memória, por um resolver local que também impede `include`/`import` fora da pasta (nada vem da rede).
+  - A NT 009 v1.01 (CNPJ alfanumérico, IBS/CBS no Simples) ainda não está em produção. CNPJ alfanumérico do prestador dá `ISSUER_CNPJ_UNSUPPORTED`, e o do tomador dá `RECIPIENT_UNSUPPORTED`.
+- **DPS do MEI** (regras do Anexo I v1.01 conferidas):
+  - `tpEmit=1`, `opSimpNac=2`, `regEspTrib=0` e `tpRetISSQN=1`. MEI não tem retenção de ISSQN, então `withholdingResponsibility` dá `MEI_WITHHOLDING_NOT_ALLOWED`.
+  - `tribISSQN=1` e `totTrib/indTotTrib=0`.
+  - Prestador só com `CNPJ` (+ `IM` se cadastrada) e `regTrib`, **sem** `xNome`/`end` (E0121/E0128).
+  - Tomador só com CPF/CNPJ válido + nome (e e-mail, se houver). Sem `taxId`, não há grupo `toma`.
+  - `cLocPrestacao` = `incidenceMunicipalityCode` ou o município do cadastro.
+  - Id = `DPS` + município + `2` + CNPJ + série (5) + nº (15). A série `1` do motor (`00001`) está na faixa "aplicativo próprio" (00001–49999), o que fecha a pendência da série provisória da F7.
+  - `dhEmi` em `-03:00`. `dCompet` = data da criação (nunca depois da emissão).
+  - Texto limpo para o `TSString` (Latin-1 imprimível; emoji e símbolos saem).
+- **Assinatura:** XMLDSig envelopada (RSA-SHA256, digest SHA-256, C14N 1.0) com o `xmlsec` sobre o XML reparseado. A `Signature` fica **sem prefixo** de namespace, porque o Anexo I recusa prefixo na área de dados.
+  - O `signxml` não gera assinatura válida sem prefixo.
+  - O C14N do lxml numa árvore montada em memória gera `xmlns=""` espúrio. Por isso a assinatura é feita sobre o XML reparseado.
+- **Antes de assinar, o worker carrega o cadastro e a credencial do cofre** e confere o titular: e-CNPJ igual ao CNPJ do cadastro, ou e-CPF igual ao `responsibleCpf` do MEI.
+  - Certificado de outro titular, vencido ou ausente vira `NOT_SENT` com `CERTIFICATE_HOLDER_MISMATCH`/`CERTIFICATE_EXPIRED`/`CERTIFICATE_INVALID`, e nada sai para a rede.
+  - Isso resolve a pendência da F7 (troca de CNPJ ou certificado depois da criação).
+- **Os 9 passos** (detalhe na docstring de `fiscal/sefin.py`):
+  - `GET /parametros_municipais/{cMun}/convenio`, em cache de 10 min. **Nunca bloqueia**: para o MEI, a emissão vale mesmo sem convênio.
+  - DPS → XSD → assinatura → XSD → GZip+Base64 em `{"dpsXmlGZipB64": …}` → `POST /nfse` por mTLS (`vault.mtls_context`).
+- **Desfechos:**
+  - `200/201` com `nfseXmlGZipB64` ⇒ a NFS-e é conferida (XSD da versão dela, Id da DPS, CNPJ do prestador e ambiente) e o desfecho é `AUTHORIZED`, com `officialKey` = chave de 50 dígitos, `protocol` = `nNFSe`, `authorizedAt` = `dhProc`, XML e DANFSe. NFS-e que não confere ⇒ `PROCESSING` (nova consulta, nunca autoriza).
+  - `400/422`:
+    - Com `E0014` (DPS já usada) ⇒ consulta `GET /dps/{id}` → `GET /nfse/{chave}`.
+    - Outro erro ⇒ `REJECTED` com `Codigo`/`Descricao`. O `Complemento` nunca é guardado (pode ter dado do contribuinte).
+  - Falha de conexão ⇒ `TEMPORARY`.
+  - Timeout de leitura, `429` e `5xx` ⇒ `TIMEOUT`: o worker consulta antes de reenviar.
+  - `401/403` ⇒ `NOT_SENT` (`UPSTREAM_AUTH_REJECTED`).
+- **Consulta:**
+  - Sem chave: `GET /dps/{id}` (`404` ⇒ `NOT_FOUND`, o único caso em que o worker reenvia).
+  - Com chave (cancelamento incerto): `GET /nfse/{chave}/eventos/101101`.
+  - Sem credencial, a consulta nunca diz "não chegou" (`TIMEOUT`).
+- **Cancelamento:** `pedRegEvento` 1.01, Id `PRE` + chave + `101101`, `cMotivo=9` + `xMotivo` = motivo do app, assinado. Vai em `POST /nfse/{chave}/eventos` (`pedidoRegistroEventoXmlGZipB64`). Recusa (`400`) confere antes se o evento já existe (evento repetido ⇒ `CANCELLED`). O XML do evento fica guardado.
+- **Substituição:** o substituto leva o grupo `subst` (`chSubstda`, `cMotivo=99`, motivo). A SEFIN cancela a original sozinha (evento 105102), e o worker fecha a original como na F7.
+- **DANFSe:** a API do ADN foi **suspensa em 03/08/2026** (NT 008 v1.02). O PDF é gerado no servidor a partir do XML autorizado, pela NT 008:
+  - Uma página A4, margens de 0,2 cm, bordas de 1/0,5 pt e cinza a 5% nos títulos.
+  - QR para `https://www.nfse.gov.br/ConsultaPublica/?tpc=1&chave=`.
+  - "NFS-e SEM VALIDADE JURÍDICA" em vermelho em produção restrita.
+  - Blocos de tomador, destinatário e intermediário com as frases de supressão.
+  - Desvios: fonte Helvetica (métrica da Arial; a Microsoft Sans Serif não é livre) e grade sem as coordenadas exatas de cada campo do Anexo I da NT.
+  - Falha no PDF não impede a autorização: o documento fica sem `auxiliaryArtifactId`.
+- **Códigos:** `sanitize_official` passou a guardar até 40 caracteres (antes 20), para caberem os códigos do próprio servidor (`CERTIFICATE_HOLDER_MISMATCH`…). Os códigos oficiais da SEFIN têm 5.
+- **Dependências novas:** `reportlab==4.2.5`, `pillow==11.0.0` e `chardet==5.2.0`, todas gratuitas. O `requirements.txt` perdeu o BOM UTF-8 que ainda tinha.
+- **Não conferido:**
+  - Os nomes dos campos JSON da SEFIN (`dpsXmlGZipB64`, `nfseXmlGZipB64`, `chaveAcesso`, `erros[].Codigo/Descricao`, `eventoXmlGZipB64`, `pedidoRegistroEventoXmlGZipB64`). O Swagger oficial só abre com certificado (403/TLS). A leitura ignora maiúsculas.
+  - O algoritmo RSA-SHA256, o CA do servidor da SEFIN e a `IM` (E0116/E0120 dependem do CNC do município).
+  - Tudo isso fica para a F10.
+
 ## Referências oficiais verificadas
 
+- NFS-e (conferido em 2026-11-12, F8): "Documentação Atual (Produção)" atualizada em 04/11/2026 com o XSD `nfse-esquemas_xsd-v1-01-20260209.zip` (SHA-256 em `fiscal/xsd/nfse/SOURCE.md`), Anexo I v1.01 (09/02/2026), Anexo II v1.01 (22/01/2026) e manual de APIs do contribuinte v1.2 (out/2025). NT 008 v1.02 (14/07/2026): DANFSe gerado pelo emissor, API do ADN suspensa em 03/08/2026. NT 009 v1.01 (11/09/2026): ainda sem cronograma de produção. RTC: https://www.gov.br/nfse/pt-br/biblioteca/documentacao-tecnica/rtc
 - NFS-e, produção atualizada em 17/04/2026: XSD `NFSe-ESQUEMAS_XSD-v1.01-20260209`, leiaute v1.01 e domínios NBS/IBS/CBS v1.01 de 22/01/2026: https://www.gov.br/nfse/pt-br/biblioteca/documentacao-tecnica/documentacao-atual/documentacao-atual
 - APIs de Produção Restrita e Produção, atualizada em 29/12/2025: https://www.gov.br/nfse/pt-br/biblioteca/documentacao-tecnica/apis-prod-restrita-e-producao
 - Implantações atualizadas em 01/07/2026: https://www.gov.br/nfse/pt-br/biblioteca/documentacao-tecnica/atualizacoes-e-implantacoes

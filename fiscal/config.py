@@ -26,9 +26,16 @@ class Settings:
     max_upload_bytes: int = int(os.getenv("FISCAL_MAX_UPLOAD_BYTES", "65536"))
     job_max_attempts: int = int(os.getenv("FISCAL_JOB_MAX_ATTEMPTS", "8"))
     vault_provider: str = os.getenv("VAULT_PROVIDER", "disabled")
-    # Provider dos documentos (F7): "unavailable" (padrão, nunca transmite) ou "fake"
-    # (autorizador em memória, só para backend local/testes; recusa produção).
+    # Provider dos documentos (F7): "unavailable" (padrão, nunca transmite), "fake"
+    # (autorizador em memória, só para backend local/testes; recusa produção) ou "sefin"
+    # (F8: NFS-e pela SEFIN Nacional, travado em produção restrita; demais tipos: unavailable).
     fiscal_provider: str = os.getenv("FISCAL_PROVIDER", "unavailable").strip().lower()
+    # F8: timeout de cada chamada à SEFIN (5–60 s, abaixo do lease do worker) e CA opcional
+    # para validar o servidor da SEFIN (padrão: certifi).
+    nfse_timeout_seconds: float = min(
+        60.0, max(5.0, float(os.getenv("FISCAL_NFSE_TIMEOUT_SECONDS", "30")))
+    )
+    nfse_ca_file: str = os.getenv("FISCAL_NFSE_CA_FILE", "").strip()
     # Worker in-process (F7): sobe no startup quando o fiscal está ligado.
     worker_enabled: bool = _bool("FISCAL_WORKER_ENABLED", True)
     worker_poll_seconds: float = float(os.getenv("FISCAL_WORKER_POLL_SECONDS", "2"))
@@ -96,8 +103,10 @@ def assert_startup_ready(current: Settings | None = None) -> None:
             "FISCAL_FEATURE_ENABLED=true exige JWT_ACTIVE_KID igual a um kid de "
             "JWT_SIGNING_KEYS"
         )
-    if current.fiscal_provider not in ("unavailable", "fake"):
-        raise RuntimeError("FISCAL_PROVIDER aceita só unavailable ou fake nesta versão")
+    if current.fiscal_provider not in ("unavailable", "fake", "sefin"):
+        raise RuntimeError("FISCAL_PROVIDER aceita só unavailable, fake ou sefin")
+    if current.nfse_ca_file and not os.path.isfile(current.nfse_ca_file):
+        raise RuntimeError("FISCAL_NFSE_CA_FILE aponta para um arquivo que não existe")
     if current.fiscal_provider == "fake" and current.production_enabled:
         raise RuntimeError(
             "FISCAL_PROVIDER=fake não pode rodar com FISCAL_PRODUCTION_ENABLED=true"

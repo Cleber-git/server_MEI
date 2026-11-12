@@ -1,0 +1,13 @@
+{
+  "tipoAmbiente": 2,
+  "versaoAplicativo": "SefinNac_Pre_1.0",
+  "dataHoraProcessamento": "2026-11-12T10:00:00-03:00",
+  "idDPS": "DPS355030821122233300018100001000000000000001",
+  "erros": [
+    {
+      "Codigo": "E0310",
+      "Descricao": "O código de tributação nacional informado não existe conforme a lista de serviços nacional do Sistema Nacional NFS-e.",
+      "Complemento": "cTribNac=999999 CPF 52998224725"
+    }
+  ]
+}
