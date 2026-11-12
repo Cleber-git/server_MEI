@@ -144,6 +144,12 @@ Código em `fiscal/nfse.py` (DPS, XSD, assinatura, GZip+Base64 e leitura da NFS-
   - O algoritmo RSA-SHA256, o CA do servidor da SEFIN e a `IM` (E0116/E0120 dependem do CNC do município).
   - Tudo isso fica para a F10.
 
+## Backend local para o app debug (F9, 2026-11-12)
+
+- **`scripts/dev_local_server.sh`:** recria o banco `server_mei_local` no mesmo container do gate (`server-mei-pg-test`, `127.0.0.1:55432`), semeia com `scripts/dev_seed_local.py` e serve o FastAPI em `127.0.0.1:8000` com `FISCAL_PROVIDER=fake` e o worker ligado. As chaves JWT e do cofre são geradas a cada execução e não são gravadas. Precisa do venv criado por `scripts/dev_check.sh`.
+- **Seed:** legado mínimo dos testes (`create_legacy`; o `main.create_tables()` engole os próprios erros e não serve aqui), migrations, tenant sintético `tenant-a` (login `tenant-a@example.com` / `senha-tenant-a`, só local), `PUT /establishment` completo, capability NFS-e de SP credenciada, homologação `APPROVED` e um certificado sintético (o `FakeProvider` não assina). O script recusa rodar fora de `DB_HOST=127.0.0.1` + `DB_NAME=server_mei_local`.
+- **No app:** `fiscal.debugApiBaseUrl=http://10.0.2.2:8000/` e `fiscal.debugRestrictedProduction=true` no `local.properties` (só debug). O smoke instrumentado `FiscalLocalBackendSmokeTest` roda com `-Pandroid.testInstrumentationRunnerArguments.fiscalLocalBackend=http://10.0.2.2:8000/`.
+
 ## Referências oficiais verificadas
 
 - NFS-e (conferido em 2026-11-12, F8): "Documentação Atual (Produção)" atualizada em 04/11/2026 com o XSD `nfse-esquemas_xsd-v1-01-20260209.zip` (SHA-256 em `fiscal/xsd/nfse/SOURCE.md`), Anexo I v1.01 (09/02/2026), Anexo II v1.01 (22/01/2026) e manual de APIs do contribuinte v1.2 (out/2025). NT 008 v1.02 (14/07/2026): DANFSe gerado pelo emissor, API do ADN suspensa em 03/08/2026. NT 009 v1.01 (11/09/2026): ainda sem cronograma de produção. RTC: https://www.gov.br/nfse/pt-br/biblioteca/documentacao-tecnica/rtc
