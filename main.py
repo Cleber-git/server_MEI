@@ -15,8 +15,8 @@ import json
 from email.mime.text import MIMEText
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
-from google.auth.transport.requests import Request
 from fastapi.responses import JSONResponse, FileResponse
+from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 import hashlib
 from psycopg2.extras import Json
@@ -24,7 +24,7 @@ from uuid import uuid4
 from fiscal.api import router as fiscal_router
 from fiscal.product_sales import router as product_sales_router
 from fiscal.auth import router as auth_router
-from fiscal.errors import ApiProblem, api_problem_handler
+from fiscal.errors import ApiProblem, api_problem_handler, request_validation_handler
 from cpt_recursos.api import router as cpt_recursos_router, initialize_tables as initialize_cpt_recursos
 from fornecedores.api import router as fornecedores_router, initialize_tables as initialize_fornecedores
 try:
@@ -40,6 +40,7 @@ except ImportError:
 
 app = FastAPI()
 app.add_exception_handler(ApiProblem, api_problem_handler)
+app.add_exception_handler(RequestValidationError, request_validation_handler)
 app.include_router(auth_router)
 app.include_router(fiscal_router)
 app.include_router(product_sales_router)
@@ -2468,6 +2469,22 @@ def finance_delete(item_id: int, user_id: int = Depends(get_finance_user)):
         cur = conn.cursor(); cur.execute("DELETE FROM financeiro_lancamento WHERE id=%s AND usuario_id=%s", (item_id,user_id)); conn.commit()
         return {"sucesso": cur.rowcount > 0}
     finally: put_conn(conn)
+
+
+@app.delete("/api/financeiro/lancamentos")
+def finance_delete_all(user_id: int = Depends(get_finance_user)):
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM financeiro_lancamento WHERE usuario_id=%s", (user_id,))
+        deleted_count = cur.rowcount
+        conn.commit()
+        return {"sucesso": True, "excluidos": deleted_count}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        put_conn(conn)
 
 
 @app.get("/api/financeiro/viagens")

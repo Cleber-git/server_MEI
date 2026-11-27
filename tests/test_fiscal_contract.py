@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from fiscal.schemas import FiscalCapabilitiesDto, FiscalConfigDto
+from fiscal.vault import _cnpj_check_digits
 
 
 def test_android_config_contract_has_exact_required_fields():
@@ -23,6 +24,11 @@ def test_android_config_contract_has_exact_required_fields():
 def test_capabilities_fail_closed():
     value = FiscalCapabilitiesDto(uf="SP", version="test", reason="not homologated")
     assert value.nfseAutomatic is value.nfce is value.nfe is False
+
+
+def test_alphanumeric_cnpj_check_digits_follow_ascii_minus_48_rule():
+    assert _cnpj_check_digits("12ABC34501DE35")
+    assert not _cnpj_check_digits("12ABC34501DE34")
 
 
 def test_migration_enforces_tenant_and_authorized_completeness():

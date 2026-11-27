@@ -13,3 +13,6 @@ svg{display:block;stroke-width:1.9}.icon-button,.text-btn{display:inline-flex;al
 .card-actions{display:grid;grid-template-columns:1fr 44px;gap:8px;align-items:end;margin-top:16px}.card-actions .secondary{width:100%;margin:0}.card-actions .danger-icon{width:44px;height:44px;margin:0;border:1px solid #efd8d1;border-radius:11px;background:#fff7f4;color:#b75843;display:grid;place-items:center;transition:.2s}.card-actions .danger-icon:hover{background:#f8dfd7;border-color:#e7bcae}.card-actions .danger-icon svg{width:18px;height:18px}.reserve-card .card-actions button{margin-top:0}
 @media(max-width:720px){.card-actions{grid-template-columns:1fr 46px}.card-actions .danger-icon{width:46px;height:46px}}
 .form-notice{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-radius:12px;background:#edf4f0;color:var(--green);font-size:12px;line-height:1.45}.form-notice svg{width:17px;height:17px;flex:0 0 17px;margin-top:1px}
+
+.danger-button{border:1px solid #f0c9bf;border-radius:10px;background:#fff7f4;color:#a84430;padding:9px 13px;font-weight:700;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}.danger-button:hover{background:#fbe6df}
+@media(max-width:560px){.section-tools{align-items:stretch;flex-direction:column}.section-tools .segmented{justify-content:center}.danger-button{justify-content:center}}

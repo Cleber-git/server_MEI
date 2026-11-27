@@ -3,6 +3,7 @@ from __future__ import annotations
 from uuid import uuid4
 
 from fastapi import Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 
@@ -26,6 +27,15 @@ class ApiProblem(Exception):
 
 def problem_response(request: Request, exc: ApiProblem) -> JSONResponse:
     correlation_id = getattr(request.state, "correlation_id", str(uuid4()))
+    if request.url.path.startswith("/api/v1/fiscal"):
+        return JSONResponse(
+            status_code=exc.status,
+            content={
+                "code": exc.code,
+                "message": exc.detail,
+                "correlationId": correlation_id,
+            },
+        )
     body = {
         "type": f"https://server-mei/errors/{exc.code.lower().replace('_', '-')}",
         "title": exc.title,
@@ -43,3 +53,16 @@ def problem_response(request: Request, exc: ApiProblem) -> JSONResponse:
 
 async def api_problem_handler(request: Request, exc: ApiProblem):
     return problem_response(request, exc)
+
+
+async def request_validation_handler(request: Request, exc: RequestValidationError):
+    if request.url.path.startswith("/api/v1/fiscal"):
+        return JSONResponse(
+            status_code=422,
+            content={
+                "code": "BAD_REQUEST",
+                "message": "Dados da requisição inválidos",
+                "correlationId": getattr(request.state, "correlation_id", str(uuid4())),
+            },
+        )
+    return JSONResponse(status_code=422, content={"detail": exc.errors()})

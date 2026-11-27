@@ -1,0 +1,467 @@
+# PROMPT — Backend fiscal do `server-mei` compatível com o app Caltech MEI
+
+Você vai implementar, no backend `server-mei`, a API fiscal que o app Android **Caltech MEI** já
+consome. O app está pronto e testado contra o contrato abaixo. Seu trabalho é fazer o servidor
+falar **exatamente** este contrato: mesmos caminhos, mesmos nomes de campo, mesmos valores de
+enum, mesmos tipos. Onde este documento diz "PERGUNTE", pare e pergunte ao responsável. Nunca
+invente.
+
+Leia o documento inteiro antes de escrever código.
+
+---
+
+## 0. O que esta tarefa entrega e o que ela NÃO consegue entregar sozinha
+
+Entrega (código):
+- API `/api/v1/fiscal/*` completa, com autenticação, multi-tenant, idempotência, cofre de
+  certificado, fila de processamento, persistência imutável das notas e download de XML/DANFSe/DANFE.
+- Adaptador **NFS-e Nacional** (SEFIN Nacional) e adaptador **NF-e 55 / NFC-e 65** (SEFAZ da UF),
+  rodando em **produção restrita / homologação**.
+- Testes automatizados e um relatório de conformidade com este contrato.
+
+NÃO entrega (depende de pessoas e órgãos, não de código; registre como bloqueio externo e não
+simule):
+- certificado e-CNPJ A1 de cada MEI (é pago, comprado pelo próprio MEI numa AC da ICP-Brasil);
+- credenciamento do contribuinte na SEFAZ da UF e na NFS-e Nacional, quando exigido;
+- CSC/ID CSC da NFC-e, fornecido pela SEFAZ;
+- bateria de homologação real aprovada e autorização formal para ligar produção.
+
+**Produção fica DESLIGADA por padrão** (`productionEnabled=false`). Nenhum teste automatizado pode
+transmitir em produção.
+
+---
+
+## 1. Regras inegociáveis
+
+1. HTTPS sob `/api/v1/fiscal`. Autenticação **Bearer** real (ver seção 2). O tenant (empresa) vem
+   **só do token**. Header ou campo enviado pelo cliente nunca dá acesso a outra empresa.
+2. `Idempotency-Key` é obrigatório em `POST /documents`. Ele é único por tenant + operação +
+   payload canônico. A mesma chave com o mesmo payload devolve **a mesma** operação (mesmo `id`).
+   A mesma chave com payload diferente devolve `409` com código estável `IDEMPOTENCY_CONFLICT`.
+3. Certificado A1 e senha chegam só em `POST /certificates`. A senha é descartada logo após a
+   importação. O PFX fica **cifrado em cofre de segredos** (KMS/Vault ou equivalente), nunca em
+   coluna de banco em texto puro e nunca em log.
+4. Logs nunca contêm: XML, certificado, senha, CSC, CPF/CNPJ completo, endereço ou URL assinada.
+   Use `correlationId` em todo log.
+5. XML autorizado e XML de eventos são **imutáveis**, cifrados em repouso, auditados e com
+   backup. Nunca sobrescreva XML autorizado.
+6. Dinheiro e quantidade são **strings decimais** no JSON (ex.: `"80.00"`, `"0.250"`). No servidor
+   use tipo decimal exato (`BigDecimal`/`Decimal`/`NUMERIC`). **Proibido float/double.**
+7. Datas e horas: string **ISO-8601 em UTC** (ex.: `"2026-11-09T18:30:00Z"`). Exceção já usada pelo
+   app: os campos de `classification` são **epoch em milissegundos** (`Long`).
+8. **Nunca invente** regra fiscal: alíquota, CFOP, NCM, CST/CSOSN, código de tributação, regra por
+   UF, município, XSD, URL de autorizador. Tudo vem de fonte oficial versionada no backend. Se a
+   informação não estiver disponível, devolva rejeição de negócio clara (seção 6) e registre a
+   pendência.
+9. `AUTHORIZED` só pode ser devolvido com **todas** as evidências oficiais (seção 7). HTTP 200 sozinho
+   não autoriza nada; o app rejeita `AUTHORIZED` incompleto.
+
+---
+
+## 2. Autenticação — mudança coordenada com o app (LEIA)
+
+Hoje o app envia em toda chamada só o header `validation-uuid: <uuid da empresa>`, sem token. Isso
+**não pode** autorizar operação fiscal (qualquer um com o UUID emitiria nota em nome da empresa).
+
+Implemente:
+- login que devolve **JWT** (ou token opaco) com `sub` = usuário e o tenant = empresa;
+- todas as rotas `/api/v1/fiscal/*` exigem `Authorization: Bearer <token>`. Sem token ou com token
+  inválido: `401`. Token válido para empresa diferente do recurso: `404` (não vaze existência);
+- o header `validation-uuid` é **ignorado** nas rotas fiscais (pode continuar nas rotas antigas).
+
+PERGUNTE ao responsável qual é o fluxo de login atual (`AuthApi`) antes de mudar a resposta dele,
+e documente o formato final (endpoint, campo do token, expiração, refresh). O app vai precisar de
+uma atualização para enviar o Bearer; até lá, as rotas fiscais responderão `401` e o app cai no
+canal oficial (comportamento seguro e já testado).
+
+---
+
+## 3. Convenções de JSON (compatibilidade com o app)
+
+- O app usa **Gson**. Ao **enviar**, campos `null` são **omitidos** do JSON. Trate campo ausente
+  como `null`.
+- Ao **receber**, todo campo marcado como obrigatório abaixo deve vir **sempre presente e não
+  nulo**. Campos opcionais podem ser `null` ou ausentes. Campos extras são ignorados pelo app
+  (pode acrescentar campos, nunca renomear nem remover).
+- Booleans são `true`/`false` JSON; enums são strings em MAIÚSCULAS exatamente como listadas.
+- Corpo de erro (todas as respostas 4xx/5xx):
+  ```json
+  { "code": "CODIGO_ESTAVEL", "message": "texto em pt-BR para o usuário", "correlationId": "..." }
+  ```
+
+---
+
+## 4. Endpoints
+
+Base: `https://<host>/api/v1/fiscal`. Todas exigem Bearer. `?` = opcional/nulo.
+
+| Método | Caminho | Uso no app |
+|---|---|---|
+| GET | `/config` | ambientes e gate de produção |
+| PUT | `/config` | configuração validada do estabelecimento (painel/admin; o app ainda não chama) |
+| GET | `/capabilities?uf=XX` | decide a rota de emissão (gate do app) |
+| GET | `/certificates/status` | metadados do certificado (nunca o arquivo) |
+| POST | `/certificates` | upload multipart do PFX/P12 + senha |
+| DELETE | `/certificates/{id}` | remoção confirmada e auditada |
+| POST | `/documents` | criação **idempotente e assíncrona** |
+| GET | `/documents/{id}` | consulta / reconciliação |
+| GET | `/documents` | histórico filtrado e paginado (guardar e listar as notas) |
+| POST | `/documents/{id}/cancel` | evento de cancelamento |
+| POST | `/documents/{id}/retry` | retentativa só quando segura |
+| GET | `/documents/{id}/xml` | XML autorizado / evento (binário autenticado) |
+| GET | `/documents/{id}/auxiliary-document` | DANFSe / DANFE oficial (PDF autenticado) |
+
+### 4.1 `GET /config` → `200`
+```json
+{
+  "nfseEnvironment": "RESTRICTED_PRODUCTION",
+  "nfeEnvironment": "RESTRICTED_PRODUCTION",
+  "productionEnabled": false,
+  "provider": "SEFIN_NACIONAL",
+  "lastValidatedAt": "2026-11-09T18:30:00Z"
+}
+```
+Obrigatórios: `nfseEnvironment`, `nfeEnvironment` (`RESTRICTED_PRODUCTION` | `PRODUCTION`),
+`productionEnabled`. Opcionais: `provider`, `lastValidatedAt`. O app trata ambiente desconhecido
+como `RESTRICTED_PRODUCTION` e recusa `PRODUCTION` se `productionEnabled=false`.
+
+### 4.2 `GET /capabilities?uf=SP` → `200`
+```json
+{
+  "uf": "SP",
+  "version": "2026.11.09-1",
+  "nfseAutomatic": true,
+  "nfce": false,
+  "nfe": true,
+  "nffOfficialChannel": false,
+  "requiresCertificate": true,
+  "reason": null,
+  "nfseUnidentifiedRecipientAllowed": false,
+  "stateOfficialChannelUrl": "https://<emissor-oficial-da-sefaz>.gov.br/..."
+}
+```
+- Obrigatórios: `uf`, `version` (não vazio; versão das regras usadas), `nfseAutomatic`, `nfce`,
+  `nfe`, `nffOfficialChannel`, `requiresCertificate`. Opcionais: `reason` (pt-BR),
+  `nfseUnidentifiedRecipientAllowed`, `stateOfficialChannelUrl`.
+- `uf` ou `version` vazios fazem o app **bloquear** a emissão. Devolva valores reais.
+- `nfseAutomatic=true` **somente** se o tenant estiver credenciado e o adaptador NFS-e estiver
+  operacional naquele ambiente. `nfe`/`nfce` idem, por UF e por tenant.
+- `nffOfficialChannel=true` só quando a UF/cadastro do tenant aceitar a Nota Fiscal Fácil (NFF).
+  Com `true`, o app manda o produto **para a NFF** (não emite NF-e/NFC-e pelo app).
+- `stateOfficialChannelUrl`: endereço oficial do emissor da SEFAZ da UF. O app só abre se for
+  `https` em domínio `*.gov.br`. Não sabe a URL oficial? Mande `null`. **Não invente.**
+- Os valores por UF vêm de tabela versionada no backend, alimentada por fonte oficial.
+
+### 4.3 `GET /certificates/status` → `200`
+```json
+{
+  "configured": true,
+  "valid": true,
+  "certificateId": "cert_01H...",
+  "holder": "EMPRESA EXEMPLO LTDA:12ABC34501DE35",
+  "expiresAt": "2027-06-30T23:59:59Z",
+  "type": "A1",
+  "lastValidatedAt": "2026-11-09T18:30:00Z",
+  "holderTaxId": "12ABC34501DE35"
+}
+```
+- Obrigatórios: `configured`, `valid`. Sem certificado: `configured=false`, `valid=false`, demais
+  `null`.
+- `valid=true` só se: cadeia ICP-Brasil válida, não revogado, dentro da validade, tipo A1 e CNPJ do
+  titular **igual** ao CNPJ do tenant.
+- `holderTaxId`: CNPJ do titular lido do OID ICP-Brasil **2.16.76.1.3.3** do SubjectAltName
+  (otherName), só letras/dígitos, maiúsculo. **Aceite CNPJ alfanumérico** (IN RFB 2.229/2024; DV
+  em módulo 11 com valor de cada caractere = código ASCII − 48; exemplo oficial
+  12.ABC.345/01DE-35).
+- `expiresAt` em UTC. O app converte para a data de São Paulo.
+
+### 4.4 `POST /certificates` (multipart/form-data) → `200` com o mesmo corpo do 4.3
+- Part `certificate`: arquivo (`filename="certificado.pfx"`, `Content-Type: application/x-pkcs12`),
+  até 64 KB.
+- Part `password`: `text/plain`, UTF-8.
+- Valide como no 4.3. Rejeições: `422` com `code` em `CERTIFICATE_WRONG_PASSWORD`,
+  `CERTIFICATE_EXPIRED`, `CERTIFICATE_NOT_A1`, `CERTIFICATE_HOLDER_MISMATCH`,
+  `CERTIFICATE_REVOKED`, `CERTIFICATE_INVALID`. O app trata qualquer HTTP de erro como "servidor
+  recusou" e um `200` com `configured && valid` como sucesso; `200` sem isso vira "ainda não ativo".
+- Zere a senha da memória após a importação. Grave só o PFX cifrado no cofre e os metadados.
+  Substituir certificado: o novo só passa a valer depois de validado; o antigo é revogado no cofre.
+
+### 4.5 `DELETE /certificates/{id}` → `204`
+Remoção auditada. Documentos já autorizados continuam intactos.
+
+### 4.6 `POST /documents` → `202` (ou `200` em repetição idempotente) com `FiscalDocumentDto`
+Header obrigatório: `Idempotency-Key: <uuid gerado pelo app>`.
+
+Corpo comum (`CreateFiscalDocumentRequest`):
+```json
+{
+  "schemaVersion": "1.2",
+  "documentType": "NFSE",
+  "environment": "RESTRICTED_PRODUCTION",
+  "saleId": null,
+  "operation": null,
+  "product": null,
+  "service": { ... },
+  "recipient": { ... },
+  "items": [],
+  "payments": [],
+  "totals": { ... }
+}
+```
+- `documentType`: `NFSE` | `NFCE_65` | `NFE_55` | `OFFICIAL_NFF` (este último **não** é emitido
+  pelo backend: responda `422 DOCUMENT_TYPE_NOT_EMITTED_BY_API`).
+- `environment`: `RESTRICTED_PRODUCTION` | `PRODUCTION`. `PRODUCTION` com `productionEnabled=false`
+  → `422 PRODUCTION_DISABLED`. O ambiente efetivo é sempre decidido pelo servidor.
+- **Nunca confie** em total, regra ou código calculado pelo cliente: recalcule e valide tudo.
+
+**Serviço (NFS-e), `schemaVersion = "1.2"`:** `documentType=NFSE`, `operation=null`,
+`product=null`, `items=[]`, `payments=[]`.
+```json
+"service": {
+  "nationalTaxCode": "010101",
+  "nbs": "123456789",
+  "emissionMode": "SIMPLIFIED",
+  "description": "texto até 2000 caracteres",
+  "amount": "80.00",
+  "withholdingResponsibility": null,
+  "incidenceMunicipalityCode": null
+},
+"recipient": {
+  "taxId": "12345678909",
+  "name": "Maria",
+  "stateRegistration": null,
+  "email": "maria@exemplo.com",
+  "type": "INDIVIDUAL",
+  "foreignTaxId": null,
+  "countryCode": null
+}
+```
+- `nationalTaxCode`: 6 dígitos (código de tributação nacional). `nbs`: 9 dígitos ou `null`.
+- `emissionMode`: `SIMPLIFIED` | `COMPLETE` (o app nunca envia `OFFICIAL_PORTAL`/`BLOCKED_REVIEW`;
+  se chegar, `422`).
+- `withholdingResponsibility`: `RECIPIENT` | `INTERMEDIARY` | `null` (é um fato declarado, não
+  alíquota). `incidenceMunicipalityCode`: IBGE com 7 dígitos ou `null`; revalide.
+- `recipient` pode ser `null` (tomador não identificado). Aceite isso **só** se a capability
+  `nfseUnidentifiedRecipientAllowed=true` para o tenant; senão, `422 RECIPIENT_REQUIRED`.
+  `recipient.type`: `INDIVIDUAL` | `LEGAL_ENTITY` | `FOREIGN` | `UNIDENTIFIED`. `taxId` sem máscara
+  (CPF 11 dígitos; CNPJ 14 posições, **alfanumérico aceito**, valide o DV). Estrangeiro: `foreignTaxId`
+  + `countryCode` (ISO 3166-1 alfa-2).
+- `totals` no serviço: mande zeros coerentes; o app não usa.
+
+**Produto (NF-e 55 / NFC-e 65), `schemaVersion = "2.3"`:** `operation=null`, `items=[]`,
+`payments=[]` no nível raiz; tudo vai em `product`.
+```json
+"product": {
+  "contractVersion": "2.3",
+  "route": { "document": "NFE_55", "reason": "<ProductRoutingReason>",
+             "capabilityId": "<id>", "capabilityVersion": "<version de /capabilities>" },
+  "operation": {
+    "purpose": "SALE", "establishmentUf": "SP", "destination": "INTERNAL",
+    "recipientType": "LEGAL_ENTITY", "recipientIcmsStatus": "TAXPAYER",
+    "consumerFinal": false, "salesChannel": "IN_PERSON"
+  },
+  "recipient": {
+    "type": "LEGAL_ENTITY", "taxId": "12ABC34501DE35", "icmsStatus": "TAXPAYER",
+    "stateRegistration": "110042490114", "countryCode": "BR",
+    "completeAddressProvided": true,
+    "address": { "countryCode": "BR", "postalCode": "01001000", "street": "...", "number": "100",
+                 "complement": null, "district": "Centro", "city": "São Paulo",
+                 "cityCode": "3550308", "uf": "SP" }
+  },
+  "logistics": { "mode": "NO_TRANSPORT", "transportMode": "NONE" },
+  "paymentExpectation": "PAID",
+  "items": [ {
+    "productId": "id-local", "description": "Água", "gtin": "7891234567895",
+    "ncm": "22021000",
+    "classification": { "source": "OFFICIAL_SEARCH", "tableVersion": "...",
+                        "tablePublishedAt": 1767225600000, "confirmedAt": 1767225600000,
+                        "validUntil": null },
+    "productSource": "RESALE", "cest": null, "cfop": "5102", "unit": "UN",
+    "quantity": "0.250", "unitPrice": "12.0000000000", "grossAmount": "3.00",
+    "discountAmount": "0.00", "netAmount": "3.00", "origin": "0", "csosn": "102"
+  } ],
+  "payments": [ { "method": "PIX", "amount": "3.00" } ],
+  "totals": { "products": "3.00", "discount": "0.00", "freight": "0.00", "other": "0.00",
+              "invoice": "3.00", "paid": "3.00", "change": "0.00" }
+}
+```
+Valores de enum aceitos (exatos):
+- `purpose`: `SALE`, `RETURN`, `SHIPMENT`, `TRANSFER`, `OTHER`
+- `destination`: `INTERNAL`, `INTERSTATE`
+- `recipientType` / `recipient.type`: `INDIVIDUAL`, `LEGAL_ENTITY`, `FOREIGN`
+- `recipientIcmsStatus` / `icmsStatus`: `TAXPAYER`, `EXEMPT`, `NON_TAXPAYER`, `UNKNOWN`
+- `salesChannel`: `IN_PERSON`, `DELIVERY`, `ECOMMERCE`
+- `logistics.mode`: `NO_TRANSPORT`, `CUSTOMER_PICKUP`, `DELIVERY`
+- `logistics.transportMode`: `NONE`, `SELLER_CONTRACTED`, `RECIPIENT_CONTRACTED`, `SELLER_OWN`, `RECIPIENT_OWN`
+- `paymentExpectation`: `PAID`, `NO_PAYMENT`
+- `payments[].method`: `CASH`, `PIX`, `CREDIT_CARD`, `DEBIT_CARD`, `OTHER`
+- `items[].unit`: `UN`, `KG`, `L`, `M`, `PCT`, `CX`
+- `items[].origin`: código de origem da mercadoria de 1 dígito (`"0"` a `"8"`)
+- `items[].productSource`: `OWN_PRODUCTION`, `RESALE`
+- `classification.source`: `PURCHASE_XML`, `OFFICIAL_SEARCH`, `USER_CONFIRMED`, `PROFESSIONAL_REVIEW`
+- `cfop` 4 dígitos, `csosn` 3 dígitos, `ncm` 8 dígitos, `quantity` até 4 casas, `unitPrice` até 10.
+- `gtin`: 8, 12, 13 ou 14 dígitos, ou o literal `"SEM GTIN"` quando o produto não tem código de barras.
+
+Valide no servidor: NCM contra a tabela oficial vigente, CFOP coerente com destino/finalidade,
+CSOSN coerente com o Simples/MEI, GTIN, CEST quando exigido, soma dos itens = `totals`, pagamentos =
+`paid`, endereço completo do destinatário quando a NF-e exigir. **Não corrija silenciosamente**:
+devolva `422` com o código do campo. Se não houver base oficial para decidir, `422
+FISCAL_REVIEW_REQUIRED`.
+
+PERGUNTE: o app manda `route.capabilityId`, mas `/capabilities` ainda não tem um campo `id`.
+Proposta: acrescentar `"capabilityId"` (string estável da regra usada) em `GET /capabilities` e
+exigir que `route.capabilityId` + `capabilityVersion` batam com o vigente; se não baterem, `409
+CAPABILITY_CHANGED` (o app reconsulta). Confirme com o responsável antes de fixar.
+
+### 4.7 `FiscalDocumentDto` (resposta de create, get, cancel, retry e itens da listagem)
+```json
+{
+  "id": "doc_01H...",
+  "documentType": "NFSE",
+  "environment": "RESTRICTED_PRODUCTION",
+  "status": "PROCESSING",
+  "series": null, "number": null, "officialKey": null, "protocol": null, "authorizedAt": null,
+  "createdAt": "2026-11-09T18:30:00Z",
+  "updatedAt": "2026-11-09T18:30:02Z",
+  "fiscalErrorCode": null, "fiscalErrorMessage": null,
+  "xmlSha256": null, "xmlArtifactId": null, "auxiliaryArtifactId": null,
+  "correlationId": "c0ffee...",
+  "attempt": 1
+}
+```
+- Obrigatórios: `id`, `documentType`, `environment`, `status`, `createdAt`, `updatedAt`, `attempt` (int).
+- `status`: `DRAFT`, `VALIDATING`, `QUEUED`, `SUBMITTED`, `PROCESSING`, `AUTHORIZED`, `REJECTED`,
+  `CANCEL_PENDING`, `CANCELLED`, `CONTINGENCY_PENDING`, `ERROR_RETRYABLE`, `ERROR_FINAL`.
+  **Nenhum outro valor** (o app quebra com status desconhecido).
+- `fiscalErrorCode`/`fiscalErrorMessage`: código e motivo oficiais da rejeição (texto em pt-BR,
+  sem dado pessoal).
+
+### 4.8 `GET /documents` (guardar e listar as notas)
+Query: `type`, `status`, `from`, `to` (ISO-8601), `cursor`, `limit` (padrão 20, máx. 100).
+Resposta: `{ "items": [FiscalDocumentDto...], "nextCursor": "..." | null }`. Ordenado por
+`createdAt` decrescente. Sempre filtrado pelo tenant do token.
+
+### 4.9 Cancelamento e retentativa
+- `POST /documents/{id}/cancel` com `{ "reason": "motivo com o tamanho mínimo exigido pelo leiaute" }`
+  → documento em `CANCEL_PENDING` e depois `CANCELLED`, só com evento oficial homologado.
+  Fora do prazo ou não autorizado: `422` com código estável.
+- `POST /documents/{id}/retry`: só para `ERROR_RETRYABLE`. Nunca retransmita sem antes consultar o
+  órgão quando o envio anterior teve timeout.
+
+### 4.10 Downloads
+`/xml` → `application/xml`; `/auxiliary-document` → `application/pdf`. Autenticados a cada
+chamada (ou URL temporária curta). Só para documentos `AUTHORIZED`/`CANCELLED`; senão `404`.
+O DANFSe/DANFE é o oficial (ou gerado pelo leiaute oficial a partir do XML autorizado), nunca um
+PDF "de mentira".
+
+---
+
+## 5. Processamento
+
+1. `POST /documents`: autentica, valida sintaxe e regras, grava a intenção com a
+   `Idempotency-Key`, devolve `202` com `status=QUEUED` (ou `VALIDATING`). Não bloqueie a
+   requisição esperando o órgão.
+2. Worker: reserva série/número de forma **atômica** por emitente + ambiente + modelo; monta o
+   XML no leiaute oficial vigente; valida no XSD; assina XMLDSig com o e-CNPJ do cofre; transmite
+   por mTLS; grava a resposta oficial.
+3. Timeout ambíguo após transmitir: consulte o órgão (para NFS-e, `GET /dps/{id}`; para NF-e/NFC-e,
+   a consulta de protocolo/situação) **antes** de qualquer retransmissão.
+4. Fila com backoff + jitter só para erro temporário. Toda transição gera auditoria com
+   `correlationId`, sem payload sensível.
+5. Adaptadores NFS-e e NF-e/NFC-e separados do domínio.
+
+**NFS-e para MEI:** integração **exclusiva** com a SEFIN Nacional (nunca emissor municipal):
+- Produção restrita: `https://sefin.producaorestrita.nfse.gov.br/API/SefinNacional`
+- Produção: `https://sefin.nfse.gov.br/SefinNacional`
+
+Passos: obter do tenant CNPJ, município IBGE e regime MEI; consultar e manter com prazo curto os
+parâmetros oficiais do município e do serviço; reservar número da DPS; montar a DPS no leiaute
+vigente; validar no XSD; assinar; compactar em GZip e codificar em Base64 no envelope JSON oficial;
+`POST /nfse` por mTLS; validar e persistir XML, chave, número, código de verificação e resposta.
+O `nationalTaxCode` é confirmado contra os parâmetros oficiais, não inferido do CNAE. ISS,
+retenções, local de incidência e IBS/CBS vigentes são validados **no backend**. Use a documentação
+técnica oficial vigente do Sistema Nacional NFS-e (confira a versão no portal oficial antes de
+começar e registre-a; não use versão de memória).
+
+**NF-e 55 / NFC-e 65:** autorizador da UF do tenant, URLs e leiaute conforme o Portal Nacional da
+NF-e e a SEFAZ da UF (versionados no backend). NFC-e exige CSC/ID CSC no cofre. Contingência só a
+prevista no leiaute. Não implemente NFF por API: ela é emitida pelo próprio MEI no portal oficial.
+
+---
+
+## 6. Respostas de erro (códigos estáveis)
+
+| HTTP | Quando | `code` (exemplos) |
+|---|---|---|
+| 400 | JSON malformado, header faltando | `BAD_REQUEST`, `IDEMPOTENCY_KEY_REQUIRED` |
+| 401 | sem token / token inválido | `UNAUTHENTICATED` |
+| 404 | recurso não existe para este tenant | `NOT_FOUND` |
+| 409 | idempotência, capability mudou | `IDEMPOTENCY_CONFLICT`, `CAPABILITY_CHANGED` |
+| 422 | regra de negócio | `PRODUCTION_DISABLED`, `CERTIFICATE_REQUIRED`, `RECIPIENT_REQUIRED`, `NCM_INVALID`, `CFOP_INCOHERENT`, `TOTALS_MISMATCH`, `FISCAL_REVIEW_REQUIRED`, ... |
+| 429 | limite de taxa | `RATE_LIMITED` |
+| 503 | órgão/adaptador indisponível | `UPSTREAM_UNAVAILABLE` |
+
+Rejeição **do órgão** depois de transmitir não é erro HTTP: o documento vai para `REJECTED` com
+`fiscalErrorCode`/`fiscalErrorMessage`.
+
+---
+
+## 7. `AUTHORIZED` válido (o app confere)
+
+Só devolva `status=AUTHORIZED` com **todos** preenchidos e coerentes: `environment`, `documentType`,
+`series`, `number`, `officialKey` (chave/identificador oficial), `protocol`, `authorizedAt` (UTC),
+`xmlSha256` (64 caracteres hexadecimais minúsculos, SHA-256 do XML autorizado armazenado) e
+`xmlArtifactId` (referência do XML para download). Faltou algum: o app trata como não autorizado.
+
+---
+
+## 8. Persistência
+
+- Tabelas mínimas: `fiscal_document` (estado, metadados oficiais, tenant, ambiente, chave de
+  idempotência, hash do payload canônico), `fiscal_document_event` (cancelamento/substituição),
+  `fiscal_artifact` (XML/PDF cifrados, imutáveis, com SHA-256), `fiscal_certificate` (só
+  metadados + referência do cofre), `fiscal_capability` (regras por UF versionadas),
+  `fiscal_audit` (transições com `correlationId`).
+- Índice único: (tenant, idempotency_key). Numeração: sequência transacional por (emitente, ambiente,
+  modelo, série).
+- Retenção dos XMLs pelo prazo legal; backup e restauração testados.
+
+---
+
+## 9. Testes obrigatórios (critério de pronto)
+
+Automatizados (sem transmitir em produção; use produção restrita/homologação ou dublês):
+1. Contrato: cada JSON de exemplo deste documento é aceito/devolvido exatamente (nomes, tipos,
+   enums, campos obrigatórios presentes e não nulos).
+2. Multi-tenant: token da empresa A nunca lê, cria ou baixa nada da empresa B; `validation-uuid`
+   ignorado.
+3. Idempotência: mesma chave + mesmo payload → mesmo `id`; payload diferente → `409`; 20 requisições
+   concorrentes com a mesma chave → 1 documento.
+4. Certificado: senha errada, vencido, não A1, titular diferente (inclusive CNPJ alfanumérico),
+   revogado, válido; a senha não aparece em log nem em banco.
+5. NFS-e em produção restrita: autorização, rejeição, timeout com reconciliação, cancelamento.
+6. NF-e/NFC-e em homologação: autorização, rejeição, timeout, cancelamento, contingência aplicável.
+7. `AUTHORIZED` só com evidências completas; XML imutável; `xmlSha256` confere com o arquivo.
+8. Decimal: nenhum float/double em dinheiro; arredondamentos conferidos.
+9. Logs: varredura automática garante que não há CPF/CNPJ completo, XML, senha ou certificado.
+
+---
+
+## 10. Entregáveis
+
+1. Código + migrations + configuração do cofre (sem segredos no repositório).
+2. **OpenAPI 3** de `/api/v1/fiscal` gerado do código, batendo com este documento.
+3. `docs/fiscal-conformidade.md`: tabela "item deste prompt → arquivo/teste que comprova", versões
+   oficiais usadas (leiautes, XSD, tabelas) com data de consulta, e lista de **desvios** (cada
+   desvio precisa de aprovação do responsável pelo app).
+4. Lista de bloqueios externos que ainda faltam por tenant (certificado, credenciamento, CSC,
+   homologação).
+
+## 11. Proibido
+
+- Inventar alíquota, CFOP, NCM, CST/CSOSN, código de serviço, regra por UF, município, URL ou XSD.
+- Emissor municipal para MEI.
+- Ligar `productionEnabled` por padrão ou por variável que o app controle.
+- Devolver `AUTHORIZED` sem evidências oficiais.
+- Guardar senha do certificado; guardar PFX fora do cofre; logar dado sensível.
+- Renomear/remover campos ou enums deste contrato sem acordo com o app.

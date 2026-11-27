@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
@@ -12,6 +13,7 @@ from fastapi import (
     Form,
     Header,
     Query,
+    Response,
     Request,
     UploadFile,
 )
@@ -215,7 +217,7 @@ def capabilities(
         reasons.append(provider.reason)
         return FiscalCapabilitiesDto(
             uf=uf,
-            version="2026-08-08/inactive",
+            version="server-mei-fiscal-capabilities-v1",
             reason="; ".join(reasons),
             requiresCertificate=True,
         )
@@ -226,11 +228,11 @@ def capabilities(
 @router.post("/certificates", response_model=CertificateStatusDto)
 async def import_certificate(
     request: Request,
-    file: UploadFile = File(...),
+    certificate: UploadFile = File(...),
     password: str = Form(...),
     principal: Principal = Depends(require_permission("FISCAL_CERTIFICATE_MANAGE")),
 ):
-    if file.content_type not in {
+    if certificate.content_type not in {
         "application/x-pkcs12",
         "application/pkcs12",
         "application/octet-stream",
@@ -241,8 +243,8 @@ async def import_certificate(
             "Certificado inválido",
             "Content-Type PKCS#12 obrigatório",
         )
-    content = await file.read(settings.max_upload_bytes + 1)
-    if len(content) > settings.max_upload_bytes:
+    content = await certificate.read(min(settings.max_upload_bytes, 64 * 1024) + 1)
+    if len(content) > min(settings.max_upload_bytes, 64 * 1024):
         raise ApiProblem(
             413,
             "CERTIFICATE_INVALID",
@@ -262,8 +264,8 @@ async def import_certificate(
             principal.tenant_id, content, password
         )
         if (
-            metadata["holderTaxId"]
-            and "".join(ch for ch in cnpj if ch.isalnum()).upper()
+            not metadata["holderTaxId"]
+            or "".join(ch for ch in cnpj if ch.isalnum()).upper()
             != metadata["holderTaxId"].upper()
         ):
             LocalEncryptedCertificateVault().revoke(
@@ -278,12 +280,8 @@ async def import_certificate(
         cert_id = uuid4()
         now = datetime.now(timezone.utc)
         cur.execute(
-            "UPDATE fiscal_certificates SET status='REPLACED',revoked_at=%s WHERE tenant_id=%s AND establishment_id=%s AND status='ACTIVE'",
-            (now, principal.tenant_id, est[0]),
-        )
-        cur.execute(
             """INSERT INTO fiscal_certificates(id,tenant_id,establishment_id,vault_reference,fingerprint,serial_number,holder_masked,issuer,
-          valid_from,expires_at,type,status,last_validated_at) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'A1','ACTIVE',%s)""",
+          valid_from,expires_at,type,status,last_validated_at,holder_tax_id) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'A1','PENDING_VALIDATION',%s,%s)""",
             (
                 cert_id,
                 principal.tenant_id,
@@ -296,6 +294,7 @@ async def import_certificate(
                 metadata["validFrom"],
                 metadata["expiresAt"],
                 now,
+                metadata["holderTaxId"],
             ),
         )
         _audit(
@@ -310,12 +309,15 @@ async def import_certificate(
         conn.commit()
         return CertificateStatusDto(
             configured=True,
-            valid=True,
+            # The local vault parses PKCS#12 but does not validate ICP-Brasil
+            # trust chain and revocation. Never claim validity without those checks.
+            valid=False,
             certificateId=cert_id,
             holder=metadata["holder"],
             expiresAt=metadata["expiresAt"],
             type="A1",
             lastValidatedAt=now,
+            holderTaxId=metadata["holderTaxId"],
         )
     except ApiProblem:
         conn.rollback()
@@ -335,9 +337,10 @@ def certificate_status(
         cur = conn.cursor()
         est = _establishment(cur, principal.tenant_id)
         cur.execute(
-            """SELECT id,holder_masked,expires_at,type,last_validated_at,
-          (status='ACTIVE' AND valid_from<=NOW() AND expires_at>NOW()) FROM fiscal_certificates
-          WHERE tenant_id=%s AND establishment_id=%s AND status='ACTIVE' ORDER BY created_at DESC LIMIT 1""",
+            """SELECT c.id,c.holder_masked,c.expires_at,c.type,c.last_validated_at,
+          (c.status='ACTIVE' AND c.valid_from<=NOW() AND c.expires_at>NOW()),c.holder_tax_id,c.status,e.cnpj
+          FROM fiscal_certificates c JOIN fiscal_establishments e ON e.id=c.establishment_id AND e.tenant_id=c.tenant_id
+          WHERE c.tenant_id=%s AND c.establishment_id=%s AND c.status IN ('ACTIVE','PENDING_VALIDATION') ORDER BY c.created_at DESC LIMIT 1""",
             (principal.tenant_id, est[0]),
         )
         row = cur.fetchone()
@@ -345,12 +348,19 @@ def certificate_status(
             return CertificateStatusDto(configured=False, valid=False)
         return CertificateStatusDto(
             configured=True,
-            valid=row[5],
+            valid=(
+                row[5]
+                and row[6] is not None
+                and row[7] == "ACTIVE"
+                and "".join(char for char in row[6] if char.isalnum()).upper()
+                == "".join(char for char in row[8] if char.isalnum()).upper()
+            ),
             certificateId=row[0],
             holder=row[1],
             expiresAt=row[2],
             type=row[3],
             lastValidatedAt=row[4],
+            holderTaxId=row[6],
         )
     finally:
         put_conn(conn)
@@ -410,6 +420,7 @@ def revoke_certificate(
 @router.post("/documents", response_model=FiscalDocumentDto, status_code=202)
 def create_document(
     request: Request,
+    response: Response,
     data: CreateFiscalDocumentRequest = Body(...),
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     principal: Principal = Depends(require_permission("FISCAL_DOCUMENT_CREATE")),
@@ -429,7 +440,7 @@ def create_document(
         est = _establishment(cur, principal.tenant_id)
         if data.environment == Environment.PRODUCTION:
             raise ApiProblem(
-                409,
+                422,
                 "PRODUCTION_DISABLED",
                 "Produção desabilitada",
                 "Produção não foi habilitada pelos gates do servidor",
@@ -448,6 +459,12 @@ def create_document(
                 "Configuração fiscal incompleta",
                 "Cofre/KMS para payload fiscal não configurado",
             )
+        # Serialize the check-and-create path even when the idempotency row
+        # does not exist yet (a row-level FOR UPDATE cannot lock a missing row).
+        cur.execute(
+            "SELECT pg_advisory_xact_lock(hashtextextended(%s,0))",
+            (f"{principal.tenant_id}:{est[0]}:CREATE_DOCUMENT:{idempotency_key}",),
+        )
         cur.execute(
             """SELECT canonical_payload_hash,resource_id FROM fiscal_idempotency
           WHERE tenant_id=%s AND establishment_id=%s AND operation='CREATE_DOCUMENT' AND idempotency_key=%s FOR UPDATE""",
@@ -458,7 +475,7 @@ def create_document(
             if idem[0] != digest:
                 raise ApiProblem(
                     409,
-                    "IDEMPOTENCY_KEY_REUSED",
+                    "IDEMPOTENCY_CONFLICT",
                     "Chave de idempotência reutilizada",
                     "A chave já foi usada com outro payload",
                 )
@@ -466,6 +483,7 @@ def create_document(
                 DOC_SELECT + " WHERE d.tenant_id=%s AND d.id=%s",
                 (principal.tenant_id, idem[1]),
             )
+            response.status_code = 200
             return _document(cur.fetchone())
         document_id, correlation_id, now = (
             uuid4(),
@@ -572,12 +590,12 @@ def get_document(
 
 @router.get("/documents")
 def list_documents(
-    page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100),
-    documentType: str | None = None,
+    document_type: str | None = Query(default=None, alias="type"),
     status: str | None = None,
-    environment: str | None = None,
-    saleId: str | None = None,
+    from_: datetime | None = Query(default=None, alias="from"),
+    to: datetime | None = None,
+    cursor: str | None = None,
+    limit: int = Query(20, ge=1, le=100),
     principal: Principal = Depends(require_permission("FISCAL_DOCUMENT_READ")),
 ):
     conn = get_conn()
@@ -586,29 +604,52 @@ def list_documents(
         clauses = ["d.tenant_id=%s"]
         params = [principal.tenant_id]
         for col, val in (
-            ("d.document_type", documentType),
+            ("d.document_type", document_type),
             ("d.status", status),
-            ("d.environment", environment),
-            ("d.sale_id", saleId),
         ):
             if val:
                 clauses.append(col + "=%s")
                 params.append(val)
         where = " AND ".join(clauses)
-        cur.execute("SELECT count(*) FROM fiscal_documents d WHERE " + where, params)
-        total = cur.fetchone()[0]
+        if from_:
+            clauses.append("d.created_at >= %s")
+            params.append(from_)
+        if to:
+            clauses.append("d.created_at <= %s")
+            params.append(to)
+        if from_ and from_.utcoffset() is None or to and to.utcoffset() is None:
+            raise ApiProblem(400, "BAD_REQUEST", "Requisição inválida", "Datas devem incluir fuso horário")
+        if cursor:
+            try:
+                decoded = base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4)).decode("ascii")
+                timestamp, document_id = decoded.split("|", 1)
+                cursor_time = datetime.fromisoformat(timestamp)
+                cursor_uuid = UUID(document_id)
+                if cursor_time.utcoffset() is None:
+                    raise ValueError("cursor sem fuso")
+            except (ValueError, UnicodeDecodeError):
+                raise ApiProblem(400, "BAD_REQUEST", "Cursor inválido", "Cursor de paginação inválido")
+            clauses.append("(d.created_at,d.id) < (%s,%s)")
+            params.extend([cursor_time, cursor_uuid])
+        where = " AND ".join(clauses)
         cur.execute(
             DOC_SELECT
             + " WHERE "
             + where
-            + " ORDER BY d.created_at DESC,d.id DESC LIMIT %s OFFSET %s",
-            params + [size, (page - 1) * size],
+            + " ORDER BY d.created_at DESC,d.id DESC LIMIT %s",
+            params + [limit + 1],
         )
+        rows = cur.fetchall()
+        has_more = len(rows) > limit
+        rows = rows[:limit]
+        next_cursor = None
+        if has_more and rows:
+            last = rows[-1]
+            value = f"{last[9].isoformat()}|{last[0]}".encode("ascii")
+            next_cursor = base64.urlsafe_b64encode(value).decode("ascii").rstrip("=")
         return {
-            "items": [_document(r) for r in cur.fetchall()],
-            "page": page,
-            "size": size,
-            "total": total,
+            "items": [_document(r) for r in rows],
+            "nextCursor": next_cursor,
         }
     finally:
         put_conn(conn)

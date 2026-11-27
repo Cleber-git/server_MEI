@@ -194,6 +194,8 @@ class FiscalCapabilitiesDto(BaseModel):
     nffOfficialChannel: bool = False
     requiresCertificate: bool = False
     reason: str | None = None
+    nfseUnidentifiedRecipientAllowed: bool | None = None
+    stateOfficialChannelUrl: str | None = None
 
 
 class CertificateStatusDto(BaseModel):
@@ -204,6 +206,7 @@ class CertificateStatusDto(BaseModel):
     expiresAt: datetime | None = None
     type: str | None = None
     lastValidatedAt: datetime | None = None
+    holderTaxId: str | None = None
 
 
 class CancelFiscalDocumentRequest(StrictModel):

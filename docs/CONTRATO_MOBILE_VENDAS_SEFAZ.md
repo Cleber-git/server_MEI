@@ -175,6 +175,6 @@ retornam HTTP 200 com status PENDENTE.
 5. Confirmar cada resultado final somente depois da gravacao local.
 
 Nao existe endpoint de reenvio/reconciliacao automatica nesta entrega.
-PROCESSANDO persistente e PENDENTE exigem verificacao fiscal antes de qualquer
+PROCESSANDO persistente e PENDENTE exigem verificacao fiscal antes de  qualquer
 nova emissao. O modelo de NFC-e, CSC, certificado e credenciamento precisam
 ser preparados/configurados para a UF e ambiente utilizados.
