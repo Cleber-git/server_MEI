@@ -193,6 +193,14 @@ class FinanceAporteIn(BaseModel):
     valor: float
     data: str
     observacao: Optional[str] = None
+
+
+class FinanceDespesaFixaIn(BaseModel):
+    descricao: str
+    valor: float
+    categoria: str = "Outros"
+    dia_vencimento: int
+    observacao: Optional[str] = None
     
 class VendaCompletaIn(BaseModel):
     venda: VendaIn

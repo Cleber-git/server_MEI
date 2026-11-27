@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request, HTTPException, Query, Header, Depends
 import os
 import asyncio
+import calendar
 from typing import List, Optional
 from db import *
 from models import *
@@ -691,6 +692,22 @@ def create_finance_tables():
         """)
         cur.execute("""ALTER TABLE financeiro_reserva_aporte
                        ADD COLUMN IF NOT EXISTS lancamento_id BIGINT REFERENCES financeiro_lancamento(id) ON DELETE SET NULL""")
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS financeiro_despesa_fixa (
+                id BIGSERIAL PRIMARY KEY,
+                usuario_id BIGINT NOT NULL REFERENCES financeiro_usuario(id) ON DELETE CASCADE,
+                descricao VARCHAR(180) NOT NULL,
+                valor NUMERIC(14,2) NOT NULL CHECK (valor > 0),
+                categoria VARCHAR(80) NOT NULL DEFAULT 'Outros',
+                dia_vencimento SMALLINT NOT NULL CHECK (dia_vencimento BETWEEN 1 AND 31),
+                observacao TEXT,
+                ativo BOOLEAN NOT NULL DEFAULT TRUE,
+                criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        """)
+        cur.execute("ALTER TABLE financeiro_lancamento ADD COLUMN IF NOT EXISTS despesa_fixa_id BIGINT REFERENCES financeiro_despesa_fixa(id) ON DELETE SET NULL")
+        cur.execute("ALTER TABLE financeiro_lancamento ADD COLUMN IF NOT EXISTS mes_referencia DATE")
+        cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS financeiro_lancamento_fixa_mes_uq ON financeiro_lancamento(despesa_fixa_id,mes_referencia) WHERE despesa_fixa_id IS NOT NULL AND mes_referencia IS NOT NULL")
         cur.execute("""
             INSERT INTO financeiro_usuario (login, senha_hash, nome)
             VALUES (%s, %s, %s)
@@ -2398,35 +2415,47 @@ def finance_dashboard(user_id: int = Depends(get_finance_user)):
     conn = get_conn()
     try:
         cur = conn.cursor()
+        _ensure_monthly_fixed_launches(cur, user_id)
         cur.execute("""
             SELECT
               COALESCE(SUM(valor) FILTER (WHERE natureza='receita' AND status='pago'),0),
               COALESCE(SUM(valor) FILTER (WHERE natureza='despesa' AND status='pago'),0),
               COALESCE(SUM(valor) FILTER (WHERE natureza='despesa' AND status='pendente'),0),
               COALESCE(SUM(valor) FILTER (WHERE natureza='despesa' AND modalidade='fixo'),0)
-            FROM financeiro_lancamento WHERE usuario_id=%s
+            FROM financeiro_lancamento l WHERE usuario_id=%s
+              AND NOT EXISTS (SELECT 1 FROM financeiro_reserva_aporte a WHERE a.lancamento_id=l.id)
         """, (user_id,))
         totals = cur.fetchone()
         cur.execute("""
-            SELECT categoria, COALESCE(SUM(valor),0) FROM financeiro_lancamento
-            WHERE usuario_id=%s AND natureza='despesa' GROUP BY categoria ORDER BY SUM(valor) DESC LIMIT 6
+            SELECT categoria, COALESCE(SUM(valor),0) FROM financeiro_lancamento l
+            WHERE usuario_id=%s AND natureza='despesa'
+              AND NOT EXISTS (SELECT 1 FROM financeiro_reserva_aporte a WHERE a.lancamento_id=l.id)
+            GROUP BY categoria ORDER BY SUM(valor) DESC LIMIT 6
         """, (user_id,))
         categories = [{"categoria": r[0], "valor": float(r[1])} for r in cur.fetchall()]
         cur.execute("""
             SELECT to_char(date_trunc('month', data_vencimento), 'YYYY-MM'),
               COALESCE(SUM(valor) FILTER (WHERE natureza='receita'),0),
               COALESCE(SUM(valor) FILTER (WHERE natureza='despesa'),0)
-            FROM financeiro_lancamento WHERE usuario_id=%s AND data_vencimento >= CURRENT_DATE - INTERVAL '5 months'
+            FROM financeiro_lancamento l WHERE usuario_id=%s
+              AND NOT EXISTS (SELECT 1 FROM financeiro_reserva_aporte a WHERE a.lancamento_id=l.id)
+              AND data_vencimento >= CURRENT_DATE - INTERVAL '5 months'
             GROUP BY 1 ORDER BY 1
         """, (user_id,))
         monthly = [{"mes": r[0], "receitas": float(r[1]), "despesas": float(r[2])} for r in cur.fetchall()]
         cur.execute("""
-            SELECT l.id,l.descricao,l.valor,l.natureza,l.modalidade,l.categoria,l.data_vencimento,l.status,l.recorrente
-            FROM financeiro_lancamento l WHERE usuario_id=%s ORDER BY data_vencimento DESC, id DESC LIMIT 8
+            SELECT l.id,l.descricao,l.valor,l.natureza,l.modalidade,l.categoria,l.data_vencimento,l.status,l.recorrente,(l.despesa_fixa_id IS NOT NULL)
+            FROM financeiro_lancamento l WHERE usuario_id=%s
+              AND NOT EXISTS (SELECT 1 FROM financeiro_reserva_aporte a WHERE a.lancamento_id=l.id)
+            ORDER BY data_vencimento DESC, id DESC LIMIT 8
         """, (user_id,))
         recent = [_finance_row(r) for r in cur.fetchall()]
+        cur.execute("SELECT COALESCE(SUM(a.valor),0) FROM financeiro_reserva_aporte a JOIN financeiro_reserva r ON r.id=a.reserva_id WHERE r.usuario_id=%s", (user_id,))
+        reserved = float(cur.fetchone()[0])
+        conn.commit()
         return {"receitas": float(totals[0]), "despesas": float(totals[1]), "pendente": float(totals[2]),
-                "fixos": float(totals[3]), "saldo": float(totals[0]-totals[1]), "categorias": categories,
+                "fixos": float(totals[3]), "reservado": reserved,
+                "saldo": float(totals[0]-totals[1]-reserved), "categorias": categories,
                 "mensal": monthly, "recentes": recent}
     finally:
         put_conn(conn)
@@ -2434,7 +2463,21 @@ def finance_dashboard(user_id: int = Depends(get_finance_user)):
 
 def _finance_row(r):
     return {"id": r[0], "descricao": r[1], "valor": float(r[2]), "natureza": r[3], "modalidade": r[4],
-            "categoria": r[5], "data_vencimento": r[6].isoformat(), "status": r[7], "recorrente": r[8]}
+            "categoria": r[5], "data_vencimento": r[6].isoformat(), "status": r[7], "recorrente": r[8], "despesa_fixa": r[9]}
+
+
+def _ensure_monthly_fixed_launches(cur, user_id: int):
+    cur.execute("SELECT date_trunc('month', CURRENT_DATE)::date")
+    month_start = cur.fetchone()[0]
+    due_day_last = calendar.monthrange(month_start.year, month_start.month)[1]
+    cur.execute("SELECT id,descricao,valor,categoria,dia_vencimento,observacao FROM financeiro_despesa_fixa WHERE usuario_id=%s AND ativo=TRUE", (user_id,))
+    for fixed_id, description, amount, category, due_day, note in cur.fetchall():
+        due_date = month_start.replace(day=min(due_day, due_day_last))
+        cur.execute("""INSERT INTO financeiro_lancamento
+            (usuario_id,descricao,valor,natureza,modalidade,categoria,data_vencimento,status,recorrente,observacao,despesa_fixa_id,mes_referencia)
+            VALUES (%s,%s,%s,'despesa','fixo',%s,%s,'pendente',TRUE,%s,%s,%s)
+            ON CONFLICT DO NOTHING""",
+            (user_id,description,amount,category,due_date,note,fixed_id,month_start))
 
 
 @app.get("/api/financeiro/lancamentos")
@@ -2442,10 +2485,76 @@ def finance_list(user_id: int = Depends(get_finance_user)):
     conn = get_conn()
     try:
         cur = conn.cursor()
-        cur.execute("""SELECT id,descricao,valor,natureza,modalidade,categoria,data_vencimento,status,recorrente
-                       FROM financeiro_lancamento WHERE usuario_id=%s ORDER BY data_vencimento DESC,id DESC""", (user_id,))
-        return [_finance_row(r) for r in cur.fetchall()]
+        _ensure_monthly_fixed_launches(cur, user_id)
+        cur.execute("""SELECT id,descricao,valor,natureza,modalidade,categoria,data_vencimento,status,recorrente,(l.despesa_fixa_id IS NOT NULL)
+                       FROM financeiro_lancamento l WHERE usuario_id=%s
+                         AND NOT EXISTS (SELECT 1 FROM financeiro_reserva_aporte a WHERE a.lancamento_id=l.id)
+                       ORDER BY data_vencimento DESC,id DESC""", (user_id,))
+        result = [_finance_row(r) for r in cur.fetchall()]
+        conn.commit()
+        return result
     finally: put_conn(conn)
+
+
+@app.get("/api/financeiro/despesas-fixas")
+def finance_fixed_list(user_id: int = Depends(get_finance_user)):
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        _ensure_monthly_fixed_launches(cur, user_id)
+        cur.execute("""SELECT f.id,f.descricao,f.valor,f.categoria,f.dia_vencimento,l.id,l.status
+                       FROM financeiro_despesa_fixa f
+                       LEFT JOIN financeiro_lancamento l ON l.despesa_fixa_id=f.id AND l.mes_referencia=date_trunc('month',CURRENT_DATE)::date
+                       WHERE f.usuario_id=%s AND f.ativo=TRUE ORDER BY f.dia_vencimento,f.id""", (user_id,))
+        result = [{"id":r[0],"descricao":r[1],"valor":float(r[2]),"categoria":r[3],"dia_vencimento":r[4],"lancamento_id":r[5],"status":r[6]} for r in cur.fetchall()]
+        conn.commit()
+        return result
+    finally:
+        put_conn(conn)
+
+
+@app.post("/api/financeiro/despesas-fixas")
+def finance_fixed_create(data: FinanceDespesaFixaIn, user_id: int = Depends(get_finance_user)):
+    if data.valor <= 0 or not 1 <= data.dia_vencimento <= 31:
+        raise HTTPException(status_code=422, detail="Informe valor positivo e vencimento entre 1 e 31")
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("INSERT INTO financeiro_despesa_fixa (usuario_id,descricao,valor,categoria,dia_vencimento,observacao) VALUES (%s,%s,%s,%s,%s,%s) RETURNING id",
+                    (user_id,data.descricao,data.valor,data.categoria,data.dia_vencimento,data.observacao))
+        fixed_id = cur.fetchone()[0]
+        _ensure_monthly_fixed_launches(cur, user_id)
+        conn.commit()
+        return {"id":fixed_id,"sucesso":True}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        put_conn(conn)
+
+
+@app.delete("/api/financeiro/despesas-fixas/{fixed_id}")
+def finance_fixed_delete(fixed_id: int, user_id: int = Depends(get_finance_user)):
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("UPDATE financeiro_despesa_fixa SET ativo=FALSE WHERE id=%s AND usuario_id=%s AND ativo=TRUE", (fixed_id,user_id))
+        conn.commit()
+        return {"sucesso":cur.rowcount > 0}
+    finally:
+        put_conn(conn)
+
+
+@app.post("/api/financeiro/lancamentos/{item_id}/pagar")
+def finance_mark_paid(item_id: int, user_id: int = Depends(get_finance_user)):
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("UPDATE financeiro_lancamento SET status='pago' WHERE id=%s AND usuario_id=%s AND natureza='despesa' AND status='pendente'", (item_id,user_id))
+        conn.commit()
+        return {"sucesso":cur.rowcount > 0}
+    finally:
+        put_conn(conn)
 
 
 @app.post("/api/financeiro/lancamentos")
@@ -2466,7 +2575,7 @@ def finance_create(data: FinanceLancamentoIn, user_id: int = Depends(get_finance
 def finance_delete(item_id: int, user_id: int = Depends(get_finance_user)):
     conn = get_conn()
     try:
-        cur = conn.cursor(); cur.execute("DELETE FROM financeiro_lancamento WHERE id=%s AND usuario_id=%s", (item_id,user_id)); conn.commit()
+        cur = conn.cursor(); cur.execute("DELETE FROM financeiro_lancamento WHERE id=%s AND usuario_id=%s AND despesa_fixa_id IS NULL", (item_id,user_id)); conn.commit()
         return {"sucesso": cur.rowcount > 0}
     finally: put_conn(conn)
 
@@ -2476,7 +2585,7 @@ def finance_delete_all(user_id: int = Depends(get_finance_user)):
     conn = get_conn()
     try:
         cur = conn.cursor()
-        cur.execute("DELETE FROM financeiro_lancamento WHERE usuario_id=%s", (user_id,))
+        cur.execute("DELETE FROM financeiro_lancamento WHERE usuario_id=%s AND despesa_fixa_id IS NULL AND NOT EXISTS (SELECT 1 FROM financeiro_reserva_aporte a WHERE a.lancamento_id=financeiro_lancamento.id)", (user_id,))
         deleted_count = cur.rowcount
         conn.commit()
         return {"sucesso": True, "excluidos": deleted_count}
@@ -2590,14 +2699,9 @@ def finance_reserve_deposit(reserve_id: int, data: FinanceAporteIn, user_id: int
         cur.execute("SELECT nome,tipo FROM financeiro_reserva WHERE id=%s AND usuario_id=%s", (reserve_id,user_id))
         reserve=cur.fetchone()
         if not reserve: raise HTTPException(status_code=404,detail="Reserva nao encontrada")
-        cur.execute("""INSERT INTO financeiro_lancamento
-            (usuario_id,descricao,valor,natureza,modalidade,categoria,data_vencimento,status,recorrente,observacao)
-            VALUES (%s,%s,%s,'despesa','planejamento','Reservas',%s,'pago',FALSE,%s) RETURNING id""",
-            (user_id,"Aporte — "+reserve[0],data.valor,data.data,data.observacao))
-        entry_id=cur.fetchone()[0]
         cur.execute("""INSERT INTO financeiro_reserva_aporte (reserva_id,lancamento_id,valor,data,observacao)
                        VALUES (%s,%s,%s,%s,%s) RETURNING id""",
-                    (reserve_id,entry_id,data.valor,data.data,data.observacao))
+                    (reserve_id,None,data.valor,data.data,data.observacao))
         new_id=cur.fetchone()[0]; conn.commit(); return {"id":new_id,"sucesso":True}
     finally: put_conn(conn)
 
